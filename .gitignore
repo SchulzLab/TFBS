@@ -1,0 +1,7 @@
+# Compiled object files
+*.o
+
+# Vim temporary files
+*.swp
+*.swo
+*~
