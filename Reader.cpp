@@ -53,6 +53,20 @@ Reader::Reader(Reader&& other_reader) :
 
 
 
+Reader& Reader::operator=(Reader&& other_reader){
+
+    matrix_ = move(other_reader.matrix_);
+    number_of_data_types_ = other_reader.number_of_data_types_;
+    last_found_pos_ = other_reader.last_found_pos_;
+    last_found_it_ = other_reader.last_found_it_;
+    actual_file_ = other_reader.actual_file_;
+    return *this;
+}
+
+
+
+
+
 // void Reader::read_files_in_directory(const string& directory_path) {
 //
 //     bf::path directory(directory_path);

@@ -28,6 +28,8 @@ class Reader
         // ---
 
 
+        // move assignment operator
+        Reader& operator=(Reader&& other_reader);
 
         // reads all files contained in the given directory
         //
