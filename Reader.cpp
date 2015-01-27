@@ -101,8 +101,15 @@ void Reader::read_file(const string& file_path, int data_type) {
 
     actual_file_ = fopen (file_path.c_str(), "r");
 
-    // set last foun pos for initial binary search
+    // set last found pos for initial binary search
     last_found_pos_ = matrix_.get_number_of_lines() / 2;
+
+    // set last found it for initial binary search
+    last_found_it_ = matrix_.front();
+    for (int i = 0; i < last_found_pos_; ++i) {
+
+        ++last_found_it_;
+    }
 
     // variables holding the content of one line of the file temporarily
     int chrom_begin, chrom_end, peak;

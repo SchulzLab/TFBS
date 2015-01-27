@@ -61,6 +61,8 @@ class Matrix {
         // @return: the last line of matrix_
         vector<T> last_line();
 
+        vector<T> first_line();
+
         // returns a proper representation of the matrix
         friend ostream& operator<<(ostream& os, const Matrix& M) {
 
@@ -245,6 +247,15 @@ template <typename T> typename list<vector<T>>::iterator Matrix<T>::insert_new_l
         matrix_.insert(line_it, new_line);
     }
     return line_it;
+}
+
+
+
+
+
+template <typename T> vector<T> Matrix<T>::first_line() {
+
+    return matrix_.front();
 }
 
 
