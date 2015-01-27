@@ -105,7 +105,7 @@ void Reader::read_file(const string& file_path, int data_type) {
     last_found_pos_ = matrix_.get_number_of_lines() / 2;
 
     // set last found it for initial binary search
-    last_found_it_ = matrix_.front();
+    last_found_it_ = matrix_.first_line();
     for (int i = 0; i < last_found_pos_; ++i) {
 
         ++last_found_it_;
@@ -151,7 +151,7 @@ void Reader::store_data(const int chrom_begin, const int chrom_end, const int pe
         new_data[data_type + 2] = peak;
         matrix_.append_new_line(new_data);
 
-    } else if (chrom_begin > matrix_.last_line()[1]) {
+    } else if (chrom_begin > (*matrix_.last_line())[1]) {
 
         vector<int> new_data(number_of_data_types_ + 2, 0);
         new_data[0] = chrom_begin;

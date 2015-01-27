@@ -59,9 +59,9 @@ class Matrix {
         // access for the last line
         //
         // @return: the last line of matrix_
-        vector<T> last_line();
+        typename list<vector<T>>::iterator last_line();
 
-        vector<T> first_line();
+        typename list<vector<T>>::iterator first_line();
 
         // returns a proper representation of the matrix
         friend ostream& operator<<(ostream& os, const Matrix& M) {
@@ -253,18 +253,18 @@ template <typename T> typename list<vector<T>>::iterator Matrix<T>::insert_new_l
 
 
 
-template <typename T> vector<T> Matrix<T>::first_line() {
+template <typename T> typename list<vector<T>>::iterator Matrix<T>::first_line() {
 
-    return matrix_.front();
+    return matrix_.begin();
 }
 
 
 
 
 
-template <typename T> vector<T> Matrix<T>::last_line() {
+template <typename T> typename list<vector<T>>::iterator Matrix<T>::last_line() {
 
-    return matrix_.back();
+    return matrix_.end();
 }
 
 #endif /* MATRIX_H */
