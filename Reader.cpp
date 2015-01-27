@@ -114,7 +114,7 @@ void Reader::read_file(const string& file_path, int data_type) {
     // variables holding the content of one line of the file temporarily
     int chrom_begin, chrom_end, peak;
 
-    // read one line in the file
+    // read one line in the file per loop
     while (fscanf(actual_file_, "%d %d %d", &chrom_begin, &chrom_end, &peak) != EOF) {
 
         // store just read data in matrix
@@ -145,7 +145,7 @@ void Reader::store_data(const int chrom_begin, const int chrom_end, const int pe
     //   if not -> insert new matrix line holding the data
     if (matrix_.get_number_of_lines() == 0) {
 
-        vector<int> new_data(number_of_data_types_ + 2);
+        vector<int> new_data(number_of_data_types_ + 2, 0);
         new_data[0] = chrom_begin;
         new_data[1] = chrom_end;
         new_data[data_type + 2] = peak;
@@ -153,7 +153,7 @@ void Reader::store_data(const int chrom_begin, const int chrom_end, const int pe
 
     } else if (chrom_begin > matrix_.last_line()[1]) {
 
-        vector<int> new_data(number_of_data_types_ + 2);
+        vector<int> new_data(number_of_data_types_ + 2, 0);
         new_data[0] = chrom_begin;
         new_data[1] = chrom_end;
         new_data[data_type + 2] = peak;
@@ -273,7 +273,7 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
                 // else insert new element at actual position
                 } else {
 
-                    vector<int> new_line (number_of_data_types_ + 2, - 1);
+                    vector<int> new_line (number_of_data_types_ + 2, 0);
                     new_line[0] = chrom_begin;
                     new_line[1] = chrom_end;
                     new_line[data_type] = peak;
@@ -303,7 +303,7 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
                 // else insert new element at actual position
                 } else {
 
-                    vector<int> new_line (number_of_data_types_ + 2, - 1);
+                    vector<int> new_line (number_of_data_types_ + 2, 0);
                     new_line[0] = chrom_begin;
                     new_line[1] = chrom_end;
                     new_line[data_type] = peak;
