@@ -1,4 +1,5 @@
 #include <stdio.h>     // fprintf
+#include <string.h>    // strcmp
 #include <unistd.h>    // getopt
 #include <stdlib.h>    // exit
 
@@ -42,37 +43,11 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     bool directory_flag = false;
 
     // count the number of files or directorys
-    while ((c = getopt(argc, argv, "f:d:")) != - 1) {
+    //
+    for (int i = 0; i < argc; ++i) {
 
-
-        switch (c) {
-
-            case 'f':
-
-                ++number_of_data_types_;
-                break;
-
-            case 'd':
-
-                ++number_of_data_types_;
-                break;
-
-            case '?':
-
-                if (optopt == 'f' || optopt == 'd') {
-
-                    fprintf(stderr, "Missing argument for -%c option.\n", optopt);
-                } else {
-
-                    fprintf(stderr, "Unknown option: -%c\n", optopt);
-                }
-                exit(EXIT_FAILURE);
-
-            default:
-
-                fprintf(stderr, "An error occured while parsing the arguments.\n");
-                exit(EXIT_FAILURE);
-        }
+        // note: strcmp returns 0 if strings are equal
+        !strcmp(argv[i], "-f") || !strcmp(argv[i], "-d") ? ++number_of_data_types_ : 0;
     }
 
     reader_class_ = Reader(number_of_data_types_);
@@ -80,8 +55,10 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     // counter required for data type assignment for names
     int file_counter = 0;
 
-    // scan files and direcorys arguments
+    // scan files and directory arguments
     while ((c = getopt(argc, argv, "f:d:")) != - 1) {
+
+        cout << "test" << endl;
 
         switch (c) {
 
@@ -133,7 +110,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     int i = optind;
     for (int counter = 0; i < argc; ++i, ++counter) {
 
-        data_type_names_[c] = argv[i];
+        data_type_names_[counter] = argv[i];
     }
 }
 
@@ -143,7 +120,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
 void Controller::print_prev_read_data(ostream& os) {
 
-    os << "Data that hast been read:\n";
+    os << "Data that has been read:\n";
     // wiggle file specific
     os << "gen_start" << "\t" << "gen_end" << "\t";
 
