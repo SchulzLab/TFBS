@@ -58,9 +58,12 @@ class Matrix {
 
         // access for the last line
         //
-        // @return: the last line of matrix_
+        // @return: iterator pointing to the last line of matrix_
         typename list<vector<T>>::iterator last_line();
 
+        // access for the first line
+        //
+        // @return: iterator pointing to the first line of matrix_
         typename list<vector<T>>::iterator first_line();
 
         // returns a proper representation of the matrix
@@ -165,7 +168,7 @@ template <typename T> T& Matrix<T>::operator()(int linenum, int colnum) {
         // we start counting from one. Sadly size() doesn't.
         int counter = matrix_.size() - linenum - 1;
         auto line_it = matrix_.end();
-        while (counter > 0) {
+        while (counter >= 0) {
 
             --line_it;
             --counter;
@@ -227,7 +230,7 @@ template <typename T> typename list<vector<T>>::iterator Matrix<T>::insert_new_l
         // we start counting from one. Sadly size() doesn't.
         int counter = matrix_.size() - pos - 1;
         line_it = matrix_.end();
-        while (counter > 0) {
+        while (counter >= 0) {
 
             --line_it;
             --counter;
@@ -264,7 +267,7 @@ template <typename T> typename list<vector<T>>::iterator Matrix<T>::first_line()
 
 template <typename T> typename list<vector<T>>::iterator Matrix<T>::last_line() {
 
-    return matrix_.end();
+    return --matrix_.end();
 }
 
 #endif /* MATRIX_H */

@@ -141,6 +141,8 @@ Matrix<int>& Reader::get_prev_read_data() {
 
 void Reader::store_data(const int chrom_begin, const int chrom_end, const int peak, const int data_type) {
 
+    cout << "test" << endl;
+
     // checks if chromosome region has been read before
     //   if not -> insert new matrix line holding the data
     if (matrix_.get_number_of_lines() == 0) {
@@ -151,7 +153,7 @@ void Reader::store_data(const int chrom_begin, const int chrom_end, const int pe
         new_data[data_type + 2] = peak;
         matrix_.append_new_line(new_data);
 
-    } else if (chrom_begin > (*matrix_.last_line())[1]) {
+    } else if (chrom_begin > (*(matrix_.last_line()))[1]) {
 
         vector<int> new_data(number_of_data_types_ + 2, 0);
         new_data[0] = chrom_begin;
@@ -177,6 +179,7 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
     // if insertion is needed use last found line as origin for iterator finding
     // for better perfomance
     auto start_it = last_found_it_;
+
     // find iterator for matrix[starting_point]
     if (starting_point >= last_found_pos_) {
 
@@ -191,6 +194,8 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
             --start_it;
         }
     }
+
+    cout << starting_point << endl;
 
     // Info: the +1 offset in partial_peaks is due to the fact that begin as well as end
     //       counts as bin for the chromosome region
@@ -226,14 +231,14 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
                 binary_search(matrix_(start_it, 1) + 1, chrom_end, starting_point + 1, data_type, peak - partial_peak);
             }
 
-        // matrix(starting_point, 0) > chrom_begin
+        // matrix(start_it, 0) > chrom_begin
         } else {
 
-            if (matrix_(starting_point, 0) <= chrom_end) {
+            if (matrix_(start_it, 0) <= chrom_end) {
 
                 // sample:  |---|
                 // queue:    |-|
-                if (matrix_(starting_point, 1) < chrom_end) {
+                if (matrix_(start_it, 1) < chrom_end) {
 
                     // peak value that overlaps with the queue
                     const int partial_peak = round(
@@ -297,7 +302,7 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
 
         }
 
-    // matrix_(starting_point, 0) < chrom_begin
+    // matrix_(start_it, 0) < chrom_begin
     } else {
 
         if (matrix_(start_it, 1) <= chrom_end) {
@@ -310,7 +315,7 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
                 // if binary search not finished
                 if (starting_point_shift > 0) {
 
-                    binary_search(chrom_begin, chrom_end, starting_point - starting_point_shift, data_type, peak);
+                    binary_search(chrom_begin, chrom_end, starting_point + starting_point_shift, data_type, peak);
 
                 // else insert new element at actual position
                 } else {

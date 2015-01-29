@@ -58,8 +58,6 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     // scan files and directory arguments
     while ((c = getopt(argc, argv, "f:d:")) != - 1) {
 
-        cout << "test" << endl;
-
         switch (c) {
 
             case 'f':
