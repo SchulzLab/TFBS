@@ -247,7 +247,7 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
                     binary_search(chrom_begin, matrix_(start_it, 0) - 1, starting_point - 1, data_type, partial_peak_left);
 
                     const int partial_peak_right = round((chrom_end - matrix_(start_it, 1))/(chrom_end - chrom_begin)) * peak;
-                    binary_search(matrix(start_it, 1) + 1, chrom_end, starting_point + 1, data_type, partial_peak_right);
+                    binary_search(matrix_(start_it, 1) + 1, chrom_end, starting_point + 1, data_type, partial_peak_right);
 
                 // sample:  |----|
                 // queue:     |---|
