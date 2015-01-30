@@ -182,7 +182,7 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
     // if starting point is below zero -> prepend new line
     // or
     // if starting point is greater then the actual number of lines -> append new line
-    if (starting_point < 0 || starting_point > matrix_.get_number_of_lines()) {
+    if (starting_point < 0 || starting_point >= matrix_.get_number_of_lines()) {
 
         vector<int> new_line (number_of_data_types_ + 2, 0);
         new_line[0] = chrom_begin;
@@ -353,8 +353,8 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
                     new_line[1] = chrom_end;
                     new_line[data_type + 2] = peak;
 
-                    last_found_it_ = matrix_.insert_new_line(start_it, new_line);
-                    last_found_pos_ = starting_point;
+                    last_found_it_ = matrix_.insert_new_line(++start_it, new_line);
+                    last_found_pos_ = starting_point + 1;
                 }
 
             // sample:      |--|
