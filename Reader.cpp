@@ -222,8 +222,9 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
 
                 // peak value that overlaps with the queue
                 const int partial_peak = round(
-                        (matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin)
-                        ) * peak;
+                        (float)(matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin)
+                        * peak
+                        );
                 matrix_(start_it, data_type + 2) += partial_peak;
                 last_found_pos_ = starting_point;
                 last_found_it_ = start_it;
@@ -242,16 +243,17 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
 
                     // peak value that overlaps with the queue
                     const int partial_peak = round(
-                            (matrix_(start_it, 1) - matrix_(start_it, 0) + 1)/(chrom_end - chrom_begin)
-                            ) * peak;
+                            (float)(matrix_(start_it, 1) - matrix_(start_it, 0) + 1)/(chrom_end - chrom_begin)
+                            * peak
+                            );
                     matrix_(start_it, data_type + 2) += partial_peak;
                     last_found_pos_ = starting_point;
                     last_found_it_ = start_it;
                     // start binary seach for remaining left and right part of the sample
-                    const int partial_peak_left = round((matrix_(start_it, 0) - chrom_begin)/(chrom_end - chrom_begin)) * peak;
+                    const int partial_peak_left = round((float)(matrix_(start_it, 0) - chrom_begin)/(chrom_end - chrom_begin) * peak);
                     binary_search(chrom_begin, matrix_(start_it, 0) - 1, starting_point - 1, data_type, partial_peak_left);
 
-                    const int partial_peak_right = round((chrom_end - matrix_(start_it, 1))/(chrom_end - chrom_begin)) * peak;
+                    const int partial_peak_right = round((float)(chrom_end - matrix_(start_it, 1))/(chrom_end - chrom_begin) * peak);
                     binary_search(matrix_(start_it, 1) + 1, chrom_end, starting_point + 1, data_type, partial_peak_right);
 
                 // sample:  |----|
@@ -266,8 +268,9 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
 
                     // peak value that overlaps with the queue
                     const int partial_peak = round(
-                            (matrix_(start_it, 1) - matrix_(start_it, 0) + 1)/(chrom_end - chrom_begin)
-                            ) * peak;
+                            (float)(chrom_end - matrix_(start_it, 0) + 1)/(chrom_end - chrom_begin)
+                            * peak
+                            );
                     matrix_(start_it, data_type + 2) += partial_peak;
                     last_found_pos_ = starting_point;
                     last_found_it_ = start_it;
@@ -335,8 +338,9 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
 
                 // peak value that overlaps with the queue
                 const int partial_peak = round(
-                        (matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin)
-                        ) * peak;
+                        (float)(matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin)
+                        * peak
+                        );
                 matrix_(start_it, data_type + 2) += partial_peak;
                 last_found_pos_ = starting_point;
                 last_found_it_ = start_it;
@@ -363,16 +367,15 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
             // queue:  |---|
             } else {
 
-                // TODO: proof this
                 // peak value that overlaps with the queue
                 const int partial_peak = round(
-                        (matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin)
-                        ) * peak;
+                        (float)(matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin)
+                        * peak);
                 matrix_(start_it, data_type + 2) += partial_peak;
                 last_found_pos_ = starting_point;
                 last_found_it_ = start_it;
                 // binary search for all bits except the one that overlaps
-                binary_search(chrom_begin, chrom_end, starting_point + 1, data_type, peak - partial_peak);
+                binary_search(matrix_(start_it, 1) + 1, chrom_end, starting_point + 1, data_type, peak - partial_peak);
 
             }
         }
