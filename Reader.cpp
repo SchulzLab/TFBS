@@ -141,8 +141,6 @@ Matrix<int>& Reader::get_prev_read_data() {
 
 void Reader::store_data(const int chrom_begin, const int chrom_end, const int peak, const int data_type) {
 
-    cout << "test" << endl;
-
     // checks if chromosome region has been read before
     //   if not -> insert new matrix line holding the data
     if (matrix_.get_number_of_lines() == 0) {
@@ -174,7 +172,30 @@ void Reader::store_data(const int chrom_begin, const int chrom_end, const int pe
 
 void Reader::binary_search(const int chrom_begin, const int chrom_end, const int starting_point, const int data_type, const int peak) {
 
-            // TODO: Shouldn't be float more appropriate?
+
+    cout << "new line:" << endl
+        << matrix_ << "\n\n\n";
+    cout << starting_point << endl;
+
+    cout << "params:   " << chrom_begin << "/" << chrom_end << "/" << peak << "\n\n";
+
+    // if starting point is below zero -> prepend new line
+    // or
+    // if starting point is greater then the actual number of lines -> append new line
+    if (starting_point < 0 || starting_point > matrix_.get_number_of_lines()) {
+
+        vector<int> new_line (number_of_data_types_ + 2, 0);
+        new_line[0] = chrom_begin;
+        new_line[1] = chrom_end;
+        new_line[data_type + 2] = peak;
+
+        last_found_it_ = matrix_.insert_new_line(starting_point, new_line);
+        last_found_pos_ = 0;
+        // reset binary search rememberer
+        gone_left = false;
+        gone_right = false;
+        return;
+    }
 
     // if insertion is needed use last found line as origin for iterator finding
     // for better perfomance
@@ -195,7 +216,6 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
         }
     }
 
-    cout << starting_point << endl;
 
     // Info: the +1 offset in partial_peaks is due to the fact that begin as well as end
     //       counts as bin for the chromosome region
@@ -249,8 +269,11 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
                     matrix_(start_it, data_type + 2) += partial_peak;
                     last_found_pos_ = starting_point;
                     last_found_it_ = start_it;
+
                     // start binary seach for remaining left and right part of the sample
                     const int partial_peak_left = round((float)(matrix_(start_it, 0) - chrom_begin)/(chrom_end - chrom_begin) * peak);
+                    cout << matrix_(start_it, 0)  - 1 << "   " << matrix_(start_it, 1) << "   " << partial_peak_left  << endl;
+
                     binary_search(chrom_begin, matrix_(start_it, 0) - 1, starting_point - 1, data_type, partial_peak_left);
 
                     const int partial_peak_right = round((float)(chrom_end - matrix_(start_it, 1))/(chrom_end - chrom_begin) * peak);
@@ -286,8 +309,9 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
                 // real binary search
                 const int starting_point_shift = (starting_point + 1) / 2;
                 // if binary search not finished
-                if (starting_point_shift > 0) {
+                if (starting_point_shift > 0 && !gone_right) {
 
+                    gone_left = true;
                     binary_search(chrom_begin, chrom_end, starting_point - starting_point_shift, data_type, peak);
 
                 // else insert new element at actual position
@@ -296,7 +320,7 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
                     vector<int> new_line (number_of_data_types_ + 2, 0);
                     new_line[0] = chrom_begin;
                     new_line[1] = chrom_end;
-                    new_line[data_type] = peak;
+                    new_line[data_type + 2] = peak;
 
                     last_found_it_ = matrix_.insert_new_line(start_it, new_line);
                     last_found_pos_ = starting_point;
@@ -314,10 +338,11 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
             // queue:   |---|
             if (matrix_(start_it, 1) < chrom_begin) {
 
-                const int starting_point_shift = (matrix_.get_number_of_lines() - starting_point + 1) / 2;
+                const int starting_point_shift = (matrix_.get_number_of_lines() - starting_point) / 2;
                 // if binary search not finished
-                if (starting_point_shift > 0) {
+                if (starting_point_shift > 0 && !gone_left) {
 
+                    gone_right = true;
                     binary_search(chrom_begin, chrom_end, starting_point + starting_point_shift, data_type, peak);
 
                 // else insert new element at actual position
@@ -326,7 +351,7 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
                     vector<int> new_line (number_of_data_types_ + 2, 0);
                     new_line[0] = chrom_begin;
                     new_line[1] = chrom_end;
-                    new_line[data_type] = peak;
+                    new_line[data_type + 2] = peak;
 
                     last_found_it_ = matrix_.insert_new_line(start_it, new_line);
                     last_found_pos_ = starting_point;
@@ -380,4 +405,7 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
             }
         }
     }
+    // reset binary search rememberer
+    gone_left = false;
+    gone_right = false;
 }

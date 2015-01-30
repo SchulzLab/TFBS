@@ -73,6 +73,12 @@ class Reader
 
 
 
+        // since we have a strongly modified version of binary search we need
+        // to remember if we've just did a right or left jump for the binary search
+        // to avoid endless recursive descent
+        bool gone_right = false;
+        bool gone_left = false;
+
         // matrix that holds data that have been read
         // for wiggle files this should be:
         //      for each genome region a different line containing

@@ -222,8 +222,19 @@ template <typename T> typename list<vector<T>>::iterator Matrix<T>::insert_new_l
 
 template <typename T> typename list<vector<T>>::iterator Matrix<T>::insert_new_line(int pos, const vector<T>& new_line) {
 
-    typename list<vector<T>>::iterator line_it;
+    if (pos < 0) {
 
+        matrix_.push_front(new_line);
+        return matrix_.begin();
+    }
+
+    if (pos > matrix_.size()) {
+
+        matrix_.push_back(new_line);
+        return --matrix_.end();
+    }
+
+    typename list<vector<T>>::iterator line_it;
     // visit backwards
     if (pos > matrix_.size() / 2) {
 

@@ -43,7 +43,6 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     bool directory_flag = false;
 
     // count the number of files or directorys
-    //
     for (int i = 0; i < argc; ++i) {
 
         // note: strcmp returns 0 if strings are equal
