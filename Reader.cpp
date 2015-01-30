@@ -305,11 +305,11 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
     // matrix_(start_it, 0) < chrom_begin
     } else {
 
-        if (matrix_(start_it, 1) <= chrom_end) {
+        if (matrix_(start_it, 1) <= chrom_begin) {
 
             // sample:        |---|
             // queue:   |---|
-            if (matrix_(start_it, 1) < chrom_end) {
+            if (matrix_(start_it, 1) < chrom_begin) {
 
                 const int starting_point_shift = (matrix_.get_number_of_lines() - starting_point + 1) / 2;
                 // if binary search not finished
@@ -345,13 +345,36 @@ void Reader::binary_search(const int chrom_begin, const int chrom_end, const int
 
             }
 
-        // sample:   |--|
-        // queue:  |-----|
+        // matrix_(start_it, 1) > chrom_begin
         } else {
 
-            matrix_(start_it, data_type + 2) += peak;
-            last_found_pos_ = starting_point;
-            last_found_it_ = start_it;
+            // sample:   |--|
+            // queue:  |----|
+            //  or
+            // sample:   |--|
+            // queue:  |------|
+            if (matrix_(start_it, 1) >= chrom_end) {
+
+                matrix_(start_it, data_type + 2) += peak;
+                last_found_pos_ = starting_point;
+                last_found_it_ = start_it;
+
+            // sample:   |---|
+            // queue:  |---|
+            } else {
+
+                // TODO: proof this
+                // peak value that overlaps with the queue
+                const int partial_peak = round(
+                        (matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin)
+                        ) * peak;
+                matrix_(start_it, data_type + 2) += partial_peak;
+                last_found_pos_ = starting_point;
+                last_found_it_ = start_it;
+                // binary search for all bits except the one that overlaps
+                binary_search(chrom_begin, chrom_end, starting_point + 1, data_type, peak - partial_peak);
+
+            }
         }
     }
 }
