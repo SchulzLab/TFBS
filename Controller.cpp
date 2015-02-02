@@ -24,6 +24,7 @@ int main(int argc, char* argv[]) {
 
 Controller::Controller() :
         number_of_data_types_(0)
+    ,   files_()
     ,   data_type_names_()
     ,   reader_class_()
 {
@@ -41,23 +42,37 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     // argument booleans
     bool file_flag = false;
     bool directory_flag = false;
+    bool peak_flag = false;
 
     // count the number of files or directorys
     for (int i = 0; i < argc; ++i) {
 
         // note: strcmp returns 0 if strings are equal
         !strcmp(argv[i], "-f") || !strcmp(argv[i], "-d") ? ++number_of_data_types_ : 0;
+
+        if (!strcmp(argv[i], "-p")) {
+
+            if (peak_flag) {
+
+                fprintf(stderr, "Only one peak file (-p) allowed.");
+            } else {
+
+                peak_flag = true;
+            }
+        }
     }
 
     reader_class_ = Reader(number_of_data_types_);
-
-    // counter required for data type assignment for names
-    int file_counter = 0;
 
     // scan files and directory arguments
     while ((c = getopt(argc, argv, "f:d:")) != - 1) {
 
         switch (c) {
+
+            case 'p':
+
+                reader_class_.read_peak_file(optarg);
+                break;
 
             case 'f':
 
@@ -71,7 +86,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
             case '?':
 
-                if (optopt == 'f' || optopt == 'd') {
+                if (optopt == 'p' || optopt == 'f' || optopt == 'd') {
 
                     fprintf(stderr, "Missing argument for -%c option.\n", optopt);
                 } else {
@@ -89,16 +104,13 @@ void Controller::parse_arguments(int argc, char* argv[]) {
         if (file_flag) {
 
             file_flag = false;
-            reader_class_.read_file(optarg, file_counter);
+            files_.push_front(optarg);
 
         } else if (directory_flag) {
 
             // TODO: fix boost in Reader class
             // directory_flag = false;
-            // reader_class_read_files_in_directory(optarg, file_counter);
         }
-
-        ++file_counter;
     }
 
     // scan if names for the type of the files are provided
@@ -108,6 +120,11 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     for (int counter = 0; i < argc; ++i, ++counter) {
 
         data_type_names_[counter] = argv[i];
+    }
+    for (int counter = 0; counter < number_of_data_types_; ++counter) {
+
+        reader_class_.read_file(files_.front(), counter);
+        files_.pop_front();
     }
 }
 
@@ -119,7 +136,7 @@ void Controller::print_prev_read_data(ostream& os) {
 
     os << "Data that has been read:\n";
     // wiggle file specific
-    os << "gen_start" << "\t" << "gen_end" << "\t";
+    os << "gen\t" << "gen_start\t" << "gen_end\t";
 
     for (int i = 0; i < number_of_data_types_; ++i) {
 

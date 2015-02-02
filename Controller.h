@@ -30,6 +30,9 @@ class Controller {
         // number of data types that will be read
         int number_of_data_types_;
 
+        // files to read
+        list<string> files_;
+
         // corresponding names for the data type (e.g. "DNAse" "Histone_mod")
         vector<string> data_type_names_;
 

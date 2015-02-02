@@ -42,8 +42,13 @@ class Reader
         //         corresponding column in matrix_ for the type of data in the file
         void read_file(const string& file_path, int data_type);
 
+        // reads a peak file in wiggle format
+        //
+        // @param: path to a peak file
+        void read_peak_file(const string& peak_file_path);
+
         // get matrix - i.e. get previously read data
-        Matrix<int>& get_prev_read_data();
+        Matrix<float>& get_prev_read_data();
 
 
     private:
@@ -56,8 +61,9 @@ class Reader
         //
         // @param:  chromosome region start and end point
         //          measured peak
-        //          number of data_type (in wiggle files matrix columns = data type + 2)
-        void store_data(const int chrom_begin, const int chrom_end, const int peak, const int data_type);
+        //          number of data_type (in wiggle files matrix columns = data type + 3)
+        //          if peak_file is provided, -1 is data type for peak file
+        void store_data(const int chrom, const int chrom_begin, const int chrom_end, const float peak, const int data_type);
 
 
 
@@ -69,7 +75,7 @@ class Reader
         //         starting point for binary search
         //         number of data_type (in wiggle files matrix columns = data type + 2)
         //         peak of the chromosome region
-        void binary_search(const int chrom_begin, const int chromend, const int starting_point, const int data_type, const int peak);
+        void binary_search(const int chrom, const int chrom_begin, const int chromend, const int starting_point, const int data_type, const float peak);
 
 
 
@@ -83,11 +89,14 @@ class Reader
         // for wiggle files this should be:
         //      for each genome region a different line containing
         //          genome_region_start   genome_region_end   peak_test_1  peak_test_2 ...
-        Matrix<int> matrix_;
+        Matrix<float> matrix_;
 
         // number of different data types
         // i.e. number of columns in matrix_
         int number_of_data_types_;
+
+        // specifies if peak file was provided
+        bool has_peak_file_;
 
         // last found position of binary search
         // this speeds up the next binary search because the genome regions
@@ -96,7 +105,7 @@ class Reader
 
         // last used iterator for the lines of the matrix used by binary
         // search if not yet mapped regions are found in new data types
-        list<vector<int>>::iterator last_found_it_;
+        list<vector<float>>::iterator last_found_it_;
 
         // file on which the reader actually works on
         FILE* actual_file_;
