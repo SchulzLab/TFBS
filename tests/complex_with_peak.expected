@@ -1,0 +1,5 @@
+gen     gen_start   gen_end     Typ1    Typ2    Typ3
+1   1   5   1   1   0
+1   11  15  1   0   0
+2   1   10  0   2   1
+3   1   5   1   0   1
