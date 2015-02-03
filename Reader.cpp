@@ -118,6 +118,7 @@ void Reader::read_file(const string& file_path, int data_type) {
     // read one line in the file per loop
     while (fscanf(actual_file_, "%d %d %d %f", &chrom, &chrom_begin, &chrom_end, &peak) != EOF) {
 
+        cout << "line read" << endl;
         // store just read data in matrix
         store_data(chrom, chrom_begin, chrom_end, peak, data_type);
 
@@ -178,7 +179,7 @@ void Reader::store_data(const int chrom, const int chrom_begin, const int chrom_
         new_data[data_type + 3] = peak;
         matrix_.append_new_line(new_data);
 
-    } else if (chrom_begin > (*(matrix_.last_line()))[2]) {
+    } else if (chrom_begin > (*(matrix_.last_line()))[2] && chrom >= (*(matrix_.last_line()))[0]) {
 
         if (!has_peak_file_) {
 
@@ -208,7 +209,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
         << matrix_ << "\n\n\n";
     cout << starting_point << endl;
 
-    cout << "params:   " << chrom_begin << "/" << chrom_end << "/" << peak << "\n\n";
+    cout << "params:   " << chrom << "/" << chrom_begin << "/" << chrom_end << "/" << peak << "\n\n";
 
     // if starting point is below zero -> prepend new line
     // or
@@ -251,7 +252,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
 
     if (matrix_(start_it, 0) == chrom) {
 
-        // Info: the +1 offset in partial_peaks is due to the fact that begin as well as end
+        // Note: the +1 offsets in partial_peaks is due to the fact that begin as well as end
         //       counts as bin for the chromosome region
         //
         // region overlap tests
@@ -275,7 +276,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 } else {
 
                     // peak value that overlaps with the queue
-                    const float partial_peak = (float)(matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin + 1) * peak;
+                    const float partial_peak = (float)(matrix_(start_it, 2) - chrom_begin + 1)/(chrom_end - chrom_begin + 1) * peak;
                     matrix_(start_it, data_type + 3) += partial_peak;
                     last_found_pos_ = starting_point;
                     last_found_it_ = start_it;
@@ -335,7 +336,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                     // if binary search not finished
                     if (starting_point_shift > 0 && !gone_right) {
 
-                        gone_left = true;
+                        starting_point_shift == 1 ? gone_left = true : 0;
                         binary_search(chrom, chrom_begin, chrom_end, starting_point - starting_point_shift, data_type, peak);
 
                     // else insert new element at actual position
@@ -370,7 +371,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                     // if binary search not finished
                     if (starting_point_shift > 0 && !gone_left) {
 
-                        gone_right = true;
+                        starting_point_shift == 1 ? gone_right = true : 0;
                         binary_search(chrom, chrom_begin, chrom_end, starting_point + starting_point_shift, data_type, peak);
 
                     // else insert new element at actual position
@@ -443,7 +444,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
             // if binary search not finished
             if (starting_point_shift > 0 && !gone_left) {
 
-                gone_right = true;
+                starting_point_shift == 1 ? gone_right = true : 0;
                 binary_search(chrom, chrom_begin, chrom_end, starting_point + starting_point_shift, data_type, peak);
 
             // else insert new element at actual position
@@ -471,7 +472,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
             // if binary search not finished
             if (starting_point_shift > 0 && !gone_right) {
 
-                gone_left = true;
+                starting_point_shift == 1 ? gone_left = true : 0;
                 binary_search(chrom, chrom_begin, chrom_end, starting_point - starting_point_shift, data_type, peak);
 
             // else insert new element at actual position

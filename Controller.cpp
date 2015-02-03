@@ -65,7 +65,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     reader_class_ = Reader(number_of_data_types_);
 
     // scan files and directory arguments
-    while ((c = getopt(argc, argv, "f:d:")) != - 1) {
+    while ((c = getopt(argc, argv, "p:f:d:")) != - 1) {
 
         switch (c) {
 
