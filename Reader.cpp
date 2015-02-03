@@ -275,7 +275,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 } else {
 
                     // peak value that overlaps with the queue
-                    const float partial_peak = (float)(matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin) * peak;
+                    const float partial_peak = (float)(matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin + 1) * peak;
                     matrix_(start_it, data_type + 3) += partial_peak;
                     last_found_pos_ = starting_point;
                     last_found_it_ = start_it;
@@ -293,17 +293,17 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                     if (matrix_(start_it, 2) < chrom_end) {
 
                         // peak value that overlaps with the queue
-                        const float partial_peak = (float)(matrix_(start_it, 2) - matrix_(start_it, 1) + 1)/(chrom_end - chrom_begin) * peak;
+                        const float partial_peak = (float)(matrix_(start_it, 2) - matrix_(start_it, 1) + 1)/(chrom_end - chrom_begin + 1) * peak;
                         matrix_(start_it, data_type + 3) += partial_peak;
                         last_found_pos_ = starting_point;
                         last_found_it_ = start_it;
 
                         // start binary seach for remaining left and right part of the sample
-                        const float partial_peak_left = (float)(matrix_(start_it, 1) - chrom_begin)/(chrom_end - chrom_begin) * peak;
+                        const float partial_peak_left = (float)(matrix_(start_it, 1) - chrom_begin)/(chrom_end - chrom_begin + 1) * peak;
 
                         binary_search(chrom, chrom_begin, matrix_(start_it, 1) - 1, starting_point - 1, data_type, partial_peak_left);
 
-                        const float partial_peak_right = (float)(chrom_end - matrix_(start_it, 2))/(chrom_end - chrom_begin) * peak;
+                        const float partial_peak_right = (float)(chrom_end - matrix_(start_it, 2))/(chrom_end - chrom_begin + 1) * peak;
                         binary_search(chrom, matrix_(start_it, 2) + 1, chrom_end, starting_point + 1, data_type, partial_peak_right);
 
                     // sample:  |----|
@@ -317,7 +317,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                     } else {
 
                         // peak value that overlaps with the queue
-                        const float partial_peak = (float)(chrom_end - matrix_(start_it, 1) + 1)/(chrom_end - chrom_begin) * peak;
+                        const float partial_peak = (float)(chrom_end - matrix_(start_it, 1) + 1)/(chrom_end - chrom_begin + 1) * peak;
                         matrix_(start_it, data_type + 3) += partial_peak;
                         last_found_pos_ = starting_point;
                         last_found_it_ = start_it;
@@ -394,7 +394,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 } else {
 
                     // peak value that overlaps with the queue
-                    const float partial_peak = (float)(matrix_(start_it, 2) - chrom_begin + 1)/(chrom_end - chrom_begin) * peak;
+                    const float partial_peak = (float)(matrix_(start_it, 2) - chrom_begin + 1)/(chrom_end - chrom_begin + 1) * peak;
                     matrix_(start_it, data_type + 3) += partial_peak;
                     last_found_pos_ = starting_point;
                     last_found_it_ = start_it;
@@ -422,7 +422,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 } else {
 
                     // peak value that overlaps with the queue
-                    const float partial_peak = (float)(matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin) * peak;
+                    const float partial_peak = (float)(matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin + 1) * peak;
                     matrix_(start_it, data_type + 3) += partial_peak;
                     last_found_pos_ = starting_point;
                     last_found_it_ = start_it;
