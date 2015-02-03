@@ -2,8 +2,6 @@
 #include <iostream>
 #include <fstream>
 
-#include <math.h>  // round
-
 // external lib
 // #include "boost/filesystem.hpp"
 
@@ -138,6 +136,7 @@ void Reader::read_peak_file(const string& file_path) {
     FILE* peak_file = fopen (file_path.c_str(), "r");
 
     int chrom, chrom_begin, chrom_end;
+
     // read one line in the file per loop
     while (fscanf(peak_file, "%d %d %d", &chrom, &chrom_begin, &chrom_end) != EOF) {
 

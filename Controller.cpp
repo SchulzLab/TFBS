@@ -104,7 +104,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
         if (file_flag) {
 
             file_flag = false;
-            files_.push_front(optarg);
+            files_.push_back(optarg);
 
         } else if (directory_flag) {
 
