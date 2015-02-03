@@ -422,7 +422,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 } else {
 
                     // peak value that overlaps with the queue
-                    const float partial_peak = (float)(matrix_(start_it, 1) - chrom_begin + 1)/(chrom_end - chrom_begin + 1) * peak;
+                    const float partial_peak = (float)(matrix_(start_it, 2) - chrom_begin + 1)/(chrom_end - chrom_begin + 1) * peak;
                     matrix_(start_it, data_type + 3) += partial_peak;
                     last_found_pos_ = starting_point;
                     last_found_it_ = start_it;
