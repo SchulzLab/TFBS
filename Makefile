@@ -2,7 +2,7 @@ OBJECTS=Matrix.o Reader.o Controller.o
 
 PROGNAME=Reader
 
-CXXFLAGS= -std=c++1y -ggdb -Wall -pedantic -pipe
+CXXFLAGS= -std=c++0x -ggdb -Wall -pedantic -pipe
 
 .PHONY: all clean
 
