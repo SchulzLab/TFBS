@@ -82,8 +82,9 @@ class Reader
         // since we have a strongly modified version of binary search we need
         // to remember if we've just did a right or left jump for the binary search
         // to avoid endless recursive descent
-        bool gone_right = false;
-        bool gone_left = false;
+        // bool gone_right = false;
+        // bool gone_left = false;
+
 
         // matrix that holds data that have been read
         // for wiggle files this should be:
@@ -109,6 +110,12 @@ class Reader
 
         // file on which the reader actually works on
         FILE* actual_file_;
+
+        // DEBUG OUTPUT TODO
+        long line_counter_;
+
+        // remember old position for binary search
+        int old_bin_pos_;
 };
 
 #endif /* READER_H */

@@ -1,6 +1,7 @@
 // standard lib
 #include <iostream>
 #include <fstream>
+#include <math.h>  // abs()
 
 // external lib
 // #include "boost/filesystem.hpp"
@@ -19,6 +20,8 @@ Reader::Reader() :
     ,   has_peak_file_(false)
     ,   last_found_pos_(-1)
     ,   actual_file_(NULL)
+    ,   line_counter_(0)
+    ,   old_bin_pos_(-1)
 {
 }
 
@@ -32,6 +35,8 @@ Reader::Reader(int number_of_data_types) :
     ,   has_peak_file_(false)
     ,   last_found_pos_(-1)
     ,   actual_file_(NULL)
+    ,   line_counter_(0)
+    ,   old_bin_pos_(-1)
 {
 }
 
@@ -45,6 +50,7 @@ Reader::Reader(Reader&& other_reader) :
     ,   last_found_pos_(other_reader.last_found_pos_)
     ,   last_found_it_(other_reader.last_found_it_)
     ,   actual_file_(other_reader.actual_file_)
+    ,   old_bin_pos_(other_reader.old_bin_pos_)
 {
     other_reader.matrix_ = Matrix<float>();
 }
@@ -118,7 +124,7 @@ void Reader::read_file(const string& file_path, int data_type) {
     // read one line in the file per loop
     while (fscanf(actual_file_, "%d %d %d %f", &chrom, &chrom_begin, &chrom_end, &peak) != EOF) {
 
-        cout << "line read" << endl;
+        cout << ++line_counter_ << endl;
         // store just read data in matrix
         store_data(chrom, chrom_begin, chrom_end, peak, data_type);
 
@@ -179,7 +185,7 @@ void Reader::store_data(const int chrom, const int chrom_begin, const int chrom_
         new_data[data_type + 3] = peak;
         matrix_.append_new_line(new_data);
 
-    } else if (chrom_begin > (*(matrix_.last_line()))[2] && chrom >= (*(matrix_.last_line()))[0]) {
+    } else if (chrom_begin >= (*(matrix_.last_line()))[2] && chrom >= (*(matrix_.last_line()))[0]) {
 
         if (!has_peak_file_) {
 
@@ -219,8 +225,8 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
         last_found_it_ = matrix_.insert_new_line(starting_point, new_line);
         last_found_pos_ = 0;
         // reset binary search rememberer
-        gone_left = false;
-        gone_right = false;
+        // gone_left = false;
+        // gone_right = false;
         return;
     }
 
@@ -278,7 +284,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
             // matrix(start_it, 1) > chrom_begin
             } else {
 
-                if (matrix_(start_it, 1) <= chrom_end) {
+                if (matrix_(start_it, 1) < chrom_end) {
 
                     // sample:  |---|
                     // queue:    |-|
@@ -322,12 +328,18 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 // queue:        |---|
                 } else {
 
-                    // real binary search
-                    const int starting_point_shift = (starting_point + 1) / 2;
-                    // if binary search not finished
-                    if (starting_point_shift > 0 && !gone_right) {
+                    // const int starting_point_shift = (starting_point + 1) / 2;
+                    if (old_bin_pos_ == -1) {
 
-                        starting_point_shift == 1 ? gone_left = true : 0;
+                        old_bin_pos_ = 0;
+                    }
+                    const int starting_point_shift = abs(old_bin_pos_ - starting_point)/2;
+
+                    // if binary search not finished
+                    if (starting_point_shift > 0 /* && !gone_right */) {
+
+                        // starting_point_shift == 1 ? (gone_left = true) : 0;
+                        old_bin_pos_ = starting_point;
                         binary_search(chrom, chrom_begin, chrom_end, starting_point - starting_point_shift, data_type, peak);
 
                     // else insert new element at actual position
@@ -345,6 +357,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                             last_found_pos_ = starting_point;
                         }
                     }
+                    old_bin_pos_ = -1;
                 }
 
             }
@@ -356,15 +369,21 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
             // queue:   |---|
             if (matrix_(start_it, 2) <= chrom_begin) {
 
+                // const int starting_point_shift = (matrix_.get_number_of_lines() - starting_point) / 2;
+                if (old_bin_pos_ == -1) {
 
-                const int starting_point_shift = (matrix_.get_number_of_lines() - starting_point) / 2;
+                    old_bin_pos_ = matrix_.get_number_of_lines();
+                }
+                const int starting_point_shift = abs(old_bin_pos_ - starting_point)/2;
+
                 // if binary search not finished
-                if (starting_point_shift > 0 && !gone_left) {
+                if (starting_point_shift > 0 /* && !gone_left */) {
 
-                    starting_point_shift == 1 ? gone_right = true : 0;
+                    // starting_point_shift == 1 ? gone_right = true : 0;
+                    old_bin_pos_ = starting_point;
                     binary_search(chrom, chrom_begin, chrom_end, starting_point + starting_point_shift, data_type, peak);
 
-                // else insert new element at actual position
+                // else insert new element behind actual position
                 } else {
 
                     if (!has_peak_file_) {
@@ -379,6 +398,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                         last_found_pos_ = starting_point + 1;
                     }
                 }
+                old_bin_pos_ = -1;
 
 
             // matrix_(start_it, 2) > chrom_begin
@@ -417,11 +437,18 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
         // queue:   |---|
         if (matrix_(start_it, 0) < chrom) {
 
-            const int starting_point_shift = (matrix_.get_number_of_lines() - starting_point) / 2;
-            // if binary search not finished
-            if (starting_point_shift > 0 && !gone_left) {
+            // const int starting_point_shift = (matrix_.get_number_of_lines() - starting_point) / 2;
+            if (old_bin_pos_ == -1) {
 
-                starting_point_shift == 1 ? gone_right = true : 0;
+                old_bin_pos_ = matrix_.get_number_of_lines();
+            }
+            const int starting_point_shift = abs(old_bin_pos_ - starting_point)/2;
+
+            // if binary search not finished
+            if (starting_point_shift > 0 /* && !gone_left */) {
+
+                // starting_point_shift == 1 ? gone_right = true : 0;
+                old_bin_pos_ = starting_point;
                 binary_search(chrom, chrom_begin, chrom_end, starting_point + starting_point_shift, data_type, peak);
 
             // else insert new element at actual position
@@ -439,17 +466,25 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                     last_found_pos_ = starting_point + 1;
                 }
             }
+            old_bin_pos_ = -1;
 
         // sample:  |---|
         // queue:         |---|
         } else {
 
             // real binary search
-            const int starting_point_shift = (starting_point + 1) / 2;
-            // if binary search not finished
-            if (starting_point_shift > 0 && !gone_right) {
+            // const int starting_point_shift = (starting_point + 1) / 2;
+            if (old_bin_pos_ == -1) {
 
-                starting_point_shift == 1 ? gone_left = true : 0;
+                old_bin_pos_ = 0;
+            }
+            const int starting_point_shift = abs(old_bin_pos_ - starting_point)/2;
+
+            // if binary search not finished
+            if (starting_point_shift > 0 /* && !gone_right */) {
+
+                // starting_point_shift == 1 ? gone_left = true : 0;
+                old_bin_pos_ = starting_point;
                 binary_search(chrom, chrom_begin, chrom_end, starting_point - starting_point_shift, data_type, peak);
 
             // else insert new element at actual position
@@ -467,11 +502,12 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                     last_found_pos_ = starting_point;
                 }
             }
+            old_bin_pos_ = -1;
         }
     }
 
     // reset binary search rememberer
-    gone_left = false;
-    gone_right = false;
+    // gone_left = false;
+    // gone_right = false;
 
 }
