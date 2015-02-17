@@ -5,6 +5,9 @@
 
 #include "Controller.h"
 
+
+
+
 // ###################### MAIN #########################
 
 int main(int argc, char* argv[]) {
@@ -64,6 +67,12 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
     reader_class_ = Reader(number_of_data_types_);
 
+    if (!peak_flag) {
+
+        fprintf(stderr, "No peak file (-p) given.");
+        exit(EXIT_FAILURE);
+    }
+
     // scan files and directory arguments
     while ((c = getopt(argc, argv, "p:f:d:")) != - 1) {
 
@@ -108,7 +117,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
         } else if (directory_flag) {
 
-            // TODO: fix boost in Reader class
+            // TODO: implement this with boost
             // directory_flag = false;
         }
     }
@@ -121,6 +130,9 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
         data_type_names_[counter] = argv[i];
     }
+
+
+    // read files
     for (int counter = 0; counter < number_of_data_types_; ++counter) {
 
         reader_class_.read_file(files_.front(), counter);

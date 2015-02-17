@@ -5,6 +5,7 @@
 #include <stdio.h> // fscanf
 #include <utility> // pair
 
+#include "svm.h"   // struct svm_node
 #include "Matrix.h"
 
 // general file reader class
@@ -42,7 +43,7 @@ class Reader
         //         corresponding column in matrix_ for the type of data in the file
         void read_file(const string& file_path, int data_type);
 
-        // reads a peak file in wiggle format
+        // reads a peak file of ENCODE broadpeak format
         //
         // @param: path to a peak file
         void read_peak_file(const string& peak_file_path);
@@ -50,32 +51,26 @@ class Reader
         // get matrix - i.e. get previously read data
         Matrix<float>& get_prev_read_data();
 
+        // get data in libSVM format
+        //
+        // @param: (will later hold the result)
+        //          number_of_data_points -> _number of data points hence size of the following vector
+        //          data_points -> vector of data points, each holding all features. see libSVM for more info
+        void get_as_libSVM_data(int* number_of_data_points, struct svm_node** data_points);
+
 
     private:
 
 
-        // store data in matrix
-        // do overlap computation if genome region corresponds to previously read data
+        // search in matrix for given genome region, compute overlap and save peak
         //
         // called by   read_file
         //
-        // @param:  chromosome region start and end point
-        //          measured peak
-        //          number of data_type (in wiggle files matrix columns = data type + 3)
-        //          if peak_file is provided, -1 is data type for peak file
-        void store_data(const int chrom, const int chrom_begin, const int chrom_end, const float peak, const int data_type);
-
-
-
-        // search in matrix for given genome region, compute overlap and save peak
-        //
-        // called by   store_data
-        //
         // @param: chromosome region start and end point
-        //         starting point for binary search
+        //         starting point and end point for binary search
         //         number of data_type (in wiggle files matrix columns = data type + 2)
         //         peak of the chromosome region
-        void binary_search(const int chrom, const int chrom_begin, const int chromend, const int starting_point, const int data_type, const float peak);
+        void binary_search(const int chrom, const int chrom_begin, const int chromend, const int starting_point, const int end_point, const int data_type, const float peak);
 
 
 
@@ -96,26 +91,12 @@ class Reader
         // i.e. number of columns in matrix_
         int number_of_data_types_;
 
-        // specifies if peak file was provided
-        bool has_peak_file_;
-
-        // last found position of binary search
-        // this speeds up the next binary search because the genome regions
-        // are ordered within the files
-        int last_found_pos_;
-
-        // last used iterator for the lines of the matrix used by binary
-        // search if not yet mapped regions are found in new data types
-        list<vector<float>>::iterator last_found_it_;
-
         // file on which the reader actually works on
         FILE* actual_file_;
 
-        // DEBUG OUTPUT TODO
+        // counts the number of lines given by a peak file
+        // required for efficient allocation of memory for new features
         long line_counter_;
-
-        // remember old position for binary search
-        int old_bin_pos_;
 };
 
 #endif /* READER_H */
