@@ -92,6 +92,9 @@ struct svm_parameter* construct_svm_param() {
     params->svm_type = C_SVC;
     params->kernel_type = RBF;
 
+    // TODO: kernel params RBF = exp(-gamma*...)
+    params->gamma = 0;
+
     params->cache_size = 0 /* TODO */;
 
     // recommended stopping criterion by libSVM
