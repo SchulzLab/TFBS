@@ -2,7 +2,6 @@
 #define MATRIX_H
 
 #include <vector>
-#include <list>
 #include <iostream>
 #include <iomanip>
 
