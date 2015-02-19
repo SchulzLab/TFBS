@@ -4,6 +4,7 @@
 #include <stdlib.h>    // exit
 
 #include "Controller.h"
+#include "libsvm_interface.h"
 
 
 
@@ -30,7 +31,17 @@ Controller::Controller() :
     ,   files_()
     ,   data_type_names_()
     ,   reader_class_()
+    ,   model_output_file_("")
 {
+}
+
+
+
+
+
+Controller::~Controller() {
+
+    svm_free_and_destroy_model(&svm_);
 }
 
 
@@ -73,10 +84,22 @@ void Controller::parse_arguments(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    bool model_output_flag = false;
     // scan files and directory arguments
-    while ((c = getopt(argc, argv, "p:f:d:")) != - 1) {
+    while ((c = getopt(argc, argv, "p:f:d:o:")) != - 1) {
 
         switch (c) {
+
+            case 'o':
+
+                if (model_output_flag) {
+
+                    fprintf(stderr, "Error: Multiple output pathes given (-o)\n");
+                    exit(EXIT_FAILURE);
+                }
+                model_output_file_ = optarg;
+                model_output_flag = true;
+                break;
 
             case 'p':
 
@@ -95,7 +118,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
             case '?':
 
-                if (optopt == 'p' || optopt == 'f' || optopt == 'd') {
+                if (optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'o') {
 
                     fprintf(stderr, "Missing argument for -%c option.\n", optopt);
                 } else {
@@ -156,4 +179,40 @@ void Controller::print_prev_read_data(ostream& os) {
     }
     os << endl << endl;
     os << reader_class_.get_prev_read_data();
+}
+
+
+
+
+void Controller::build_svm_model() {
+
+    // Dummy
+    Matrix<float> m_neg;
+    struct svm_problem* prob = construct_svm_problem(reader_class_.get_prev_read_data(),/*TODO build negative cases*/m_neg);
+    svm_parameter* params = construct_svm_param();
+
+    // check parameters
+    const char* errormessage = svm_check_parameter(prob, params);
+
+    if (errormessage != NULL) {
+
+        fprintf(stderr, errormessage);
+    }
+
+    // train actual model
+    svm_ = svm_train(prob, params);
+}
+
+
+
+
+void Controller::print_svm_model() {
+
+    if (model_output_file_ != "") {
+
+        if (svm_save_model(model_output_file_.c_str(), svm_) != 0) {
+
+            fprintf(stderr, ("An error occured while saving the SVM model to " + model_output_file_ + "\n").c_str());
+        }
+    }
 }

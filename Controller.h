@@ -6,6 +6,7 @@
 #include <iomanip>
 
 #include "Reader.h"
+#include "svm.h"
 
 using namespace std;
 
@@ -15,15 +16,25 @@ class Controller {
 
         Controller();
 
+        ~Controller();
+
         // parse the given arguments
         //
-        // main method will delegate user arguments to this method
+        // @param: main method will delegate user arguments to this method
         //
         // WARNING: This method exits the whole program on wrong input
         void parse_arguments(int argc, char* argv[]);
 
         // print out the data that has been read
         void print_prev_read_data(ostream& os);
+
+
+        // build a svm model
+        // see also libsvm_interface.h
+        void build_svm_model();
+
+        // outputs the svm_model to model_output_file
+        void print_svm_model();
 
     private:
 
@@ -38,6 +49,13 @@ class Controller {
 
         // reads all files
         Reader reader_class_;
+
+        // trained svm model
+        struct svm_model* svm_;
+
+        // contains a filepath for saving the svm model
+        // see print_svm_model
+        string model_output_file_;
 
 };
 

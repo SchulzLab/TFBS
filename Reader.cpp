@@ -105,12 +105,21 @@ void Reader::read_file(const string& file_path, int data_type) {
 
     matrix_.append_new_column(new_feature);
 
-    // read one line in the file per loop
-    while (fscanf(actual_file_, "%d %d %d %f", &chrom, &chrom_begin, &chrom_end, &peak) != EOF) {
+    int lines = 0;
 
+    // read one line in the file per loop
+    while (fscanf(actual_file_, "%d %d %d %f", &chrom, &chrom_begin, &chrom_end, &peak) == 4) {
+
+        lines++;
+        cerr << lines << endl;
         // store just read data in matrix
         binary_search(chrom, chrom_begin, chrom_end, 0, line_counter_ - 1, data_type, peak);
 
+    }
+
+    if (!feof(actual_file_)) {
+
+        fprintf(stderr, ("\nA reading error occured while reading \"" + file_path  + "\"\n").c_str());
     }
 
     fclose(actual_file_);
@@ -152,6 +161,7 @@ void Reader::read_peak_file(const string& file_path) {
     while (fscanf(peak_file, "%d %d %d %*s %*s %*s %*s %*s %*s", &chrom, &chrom_begin, &chrom_end) == 3) {
 
         ++line_counter_;
+        cerr << line_counter_ << "\n\n";
         // if necessary allocate more memory for matrix columns
         if (line_counter_ > actually_reserved) {
 
@@ -169,10 +179,8 @@ void Reader::read_peak_file(const string& file_path) {
 
     if (!feof(peak_file)) {
 
-        fprintf(stderr, "A reading error occured");
+        fprintf(stderr, ("\nA reading error occured while reading peak file \"" + file_path  + "\"\n").c_str());
     }
-
-    cout << matrix_ << endl;
 
     fclose(peak_file);
 }
