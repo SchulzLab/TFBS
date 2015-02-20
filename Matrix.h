@@ -2,7 +2,6 @@
 #define MATRIX_H
 
 #include <vector>
-#include <list>
 #include <iostream>
 #include <iomanip>
 
@@ -39,32 +38,19 @@ class Matrix {
         int get_number_of_lines();
         int get_number_of_columns();
 
+
         // element access
         T& operator() (int line, int colnum);
-        // element access with iterator for lines - better performance
-        T& operator() (const typename list<vector<T>>::iterator line_it, int colnum);
 
-        // appends a new line to the matrix
-        //
-        // @param: the new line that should be appended
-        void append_new_line(const vector<T>& new_line);
+        vector<T>& get_column(int colnum);
 
-        // inserts new line at specified position
-        //
-        // @ param: position (or iterator to position) where the new line should be inserted
-        //          content for the new line
-        typename list<vector<T>>::iterator insert_new_line(const typename list<vector<T>>::iterator pos, const vector<T>& new_line);
-        typename list<vector<T>>::iterator insert_new_line(int pos, const vector<T>& new_line);
 
-        // access for the last line
-        //
-        // @return: iterator pointing to the last line of matrix_
-        typename list<vector<T>>::iterator last_line();
 
-        // access for the first line
+
+        // appends a new column to the matrix
         //
-        // @return: iterator pointing to the first line of matrix_
-        typename list<vector<T>>::iterator first_line();
+        // @param: the new column that should be appended
+        void append_new_column(const vector<T>& new_line);
 
         // returns a proper representation of the matrix
         friend ostream& operator<<(ostream& os, const Matrix& M) {
@@ -81,10 +67,10 @@ class Matrix {
             }
 
             // iterate over lines
-            for ( vector<T> line : M.matrix_ ) {
+            for (int lines = 0; lines < M.matrix_[0].size(); ++lines) {
                 // iterate over columns
-                for (int j = 0; j < line.size(); ++j) {
-                    os << setw(5) << right << line[j] << "\t";
+                for (int columns = 0; columns < M.matrix_.size(); ++columns) {
+                    os << setw(5) << right << M.matrix_[columns][lines] << "\t";
                 }
                 os << "\n\n\n";
             }
@@ -93,8 +79,8 @@ class Matrix {
 
     private:
 
-        // matrix line -> column access
-        list<vector<T> > matrix_;
+        // matrix columns<lines>
+        vector<vector<T> > matrix_;
 };
 
 
@@ -110,12 +96,9 @@ template <typename T> Matrix<T>::Matrix() :
 
 
 
-template <typename T> Matrix<T>::Matrix(int lines, int columns, const T& initial_value)
+template <typename T> Matrix<T>::Matrix(int lines, int columns, const T& initial_value) :
+        matrix_(columns, vector<T>(lines, initial_value))
 {
-    for (int i = 0; i < lines; ++i) {
-
-        matrix_.push_back(vector<T>(columns, initial_value));
-    }
 }
 
 
@@ -125,7 +108,7 @@ template <typename T> Matrix<T>::Matrix(int lines, int columns, const T& initial
 template <typename T> Matrix<T>::Matrix(Matrix&& M) :
         matrix_(move(M.matrix_))
 {
-    M.matrix_ = list<vector<T>>();
+    M.matrix_ = vector<vector<T>>();
 }
 
 
@@ -144,7 +127,7 @@ template <typename T> Matrix<T>& Matrix<T>::operator=(Matrix&& M) {
 
 template <typename T> int Matrix<T>::get_number_of_lines() {
 
-    return matrix_.size();
+    return matrix_[0].size();
 }
 
 
@@ -153,7 +136,7 @@ template <typename T> int Matrix<T>::get_number_of_lines() {
 
 template <typename T> int Matrix<T>::get_number_of_columns() {
 
-    return matrix_.front().size();
+    return matrix_.size();
 }
 
 
@@ -162,123 +145,25 @@ template <typename T> int Matrix<T>::get_number_of_columns() {
 
 template <typename T> T& Matrix<T>::operator()(int linenum, int colnum) {
 
-    // visit backwards
-    if (linenum > matrix_.size() / 2) {
-
-        // we start counting from one. Sadly size() doesn't.
-        int counter = matrix_.size() - linenum - 1;
-        auto line_it = matrix_.end();
-        while (counter >= 0) {
-
-            --line_it;
-            --counter;
-        }
-        return (*line_it)[colnum];
-
-    // visit forwards
-    } else {
-
-        int counter = linenum;
-        auto line_it = matrix_.begin();
-        while (counter > 0) {
-
-            ++line_it;
-            --counter;
-        }
-        return (*line_it)[colnum];
-    }
+    return matrix_[colnum][linenum];
 }
 
 
 
 
 
-template <typename T> T& Matrix<T>::operator() (const typename list<vector<T>>::iterator line_it, int colnum) {
+template <typename T> vector<T>& Matrix<T>::get_column(int colnum) {
 
-    return (*line_it)[colnum];
+    return matrix_[colnum];
 }
 
 
 
 
 
-template <typename T> void Matrix<T>::append_new_line(const vector<T>& new_line) {
+template <typename T> void Matrix<T>::append_new_column(const vector<T>& new_column) {
 
-    matrix_.push_back(new_line);
-}
-
-
-
-
-
-template <typename T> typename list<vector<T>>::iterator Matrix<T>::insert_new_line(const typename list<vector<T>>::iterator pos, const vector<T>& new_line) {
-
-    return matrix_.insert(pos, new_line);
-}
-
-
-
-
-
-template <typename T> typename list<vector<T>>::iterator Matrix<T>::insert_new_line(int pos, const vector<T>& new_line) {
-
-    if (pos < 0) {
-
-        matrix_.push_front(new_line);
-        return matrix_.begin();
-    }
-
-    if (pos > matrix_.size()) {
-
-        matrix_.push_back(new_line);
-        return --matrix_.end();
-    }
-
-    typename list<vector<T>>::iterator line_it;
-    // visit backwards
-    if (pos > matrix_.size() / 2) {
-
-        // we start counting from one. Sadly size() doesn't.
-        int counter = matrix_.size() - pos - 1;
-        line_it = matrix_.end();
-        while (counter >= 0) {
-
-            --line_it;
-            --counter;
-        }
-        matrix_.insert(line_it, new_line);
-
-    // visit forwards
-    } else {
-
-        int counter = pos;
-        line_it = matrix_.begin();
-        while (counter > 0) {
-
-            ++line_it;
-            --counter;
-        }
-        matrix_.insert(line_it, new_line);
-    }
-    return line_it;
-}
-
-
-
-
-
-template <typename T> typename list<vector<T>>::iterator Matrix<T>::first_line() {
-
-    return matrix_.begin();
-}
-
-
-
-
-
-template <typename T> typename list<vector<T>>::iterator Matrix<T>::last_line() {
-
-    return --matrix_.end();
+    matrix_.push_back(new_column);
 }
 
 #endif /* MATRIX_H */

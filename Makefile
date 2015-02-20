@@ -1,4 +1,4 @@
-OBJECTS=Matrix.o Reader.o Controller.o
+OBJECTS=Matrix.o Reader.o Controller.o svm.o libsvm_interface.o
 
 PROGNAME=Reader
 

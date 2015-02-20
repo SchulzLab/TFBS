@@ -1,6 +1,7 @@
 // standard lib
 #include <iostream>
 #include <fstream>
+#include <math.h>  // abs()
 
 // external lib
 // #include "boost/filesystem.hpp"
@@ -16,9 +17,8 @@ using namespace std;
 Reader::Reader() :
         matrix_()
     ,   number_of_data_types_(0)
-    ,   has_peak_file_(false)
-    ,   last_found_pos_(-1)
     ,   actual_file_(NULL)
+    ,   line_counter_(0)
 {
 }
 
@@ -29,9 +29,9 @@ Reader::Reader() :
 Reader::Reader(int number_of_data_types) :
         matrix_()
     ,   number_of_data_types_(number_of_data_types)
-    ,   has_peak_file_(false)
-    ,   last_found_pos_(-1)
     ,   actual_file_(NULL)
+    ,   line_counter_(0)
+    ,   chrom_numerical_(0)
 {
 }
 
@@ -42,11 +42,14 @@ Reader::Reader(int number_of_data_types) :
 Reader::Reader(Reader&& other_reader) :
         matrix_(move(other_reader.matrix_))
     ,   number_of_data_types_(other_reader.number_of_data_types_)
-    ,   last_found_pos_(other_reader.last_found_pos_)
-    ,   last_found_it_(other_reader.last_found_it_)
     ,   actual_file_(other_reader.actual_file_)
+    ,   map_str_to_chr_(other_reader.map_str_to_chr_)
+    ,   map_chr_to_str_(other_reader.map_chr_to_str_)
+    ,   chrom_numerical_(other_reader.chrom_numerical_)
 {
     other_reader.matrix_ = Matrix<float>();
+    other_reader.map_str_to_chr_ = unordered_map<string, int>();
+    other_reader.map_chr_to_str_ = unordered_map<int, string>();
 }
 
 
@@ -57,9 +60,11 @@ Reader& Reader::operator=(Reader&& other_reader){
 
     matrix_ = move(other_reader.matrix_);
     number_of_data_types_ = other_reader.number_of_data_types_;
-    last_found_pos_ = other_reader.last_found_pos_;
-    last_found_it_ = other_reader.last_found_it_;
     actual_file_ = other_reader.actual_file_;
+    map_str_to_chr_ = move(other_reader.map_str_to_chr_);
+    map_chr_to_str_ = move(other_reader.map_chr_to_str_);
+    chrom_numerical_ = other_reader.chrom_numerical_;
+
     return *this;
 }
 
@@ -101,27 +106,40 @@ void Reader::read_file(const string& file_path, int data_type) {
 
     actual_file_ = fopen (file_path.c_str(), "r");
 
-    // set last found pos for initial binary search
-    last_found_pos_ = matrix_.get_number_of_lines() / 2;
-
-    // set last found it for initial binary search
-    last_found_it_ = matrix_.first_line();
-    for (int i = 0; i < last_found_pos_; ++i) {
-
-        ++last_found_it_;
-    }
 
     // variables holding the content of one line of the file temporarily
-    int chrom_begin, chrom_end, chrom;
+    int chrom_begin, chrom_end, chromosome;
+    char chrom[50];
     float peak;
 
+    vector<float> new_feature(line_counter_, .0);
+
+    matrix_.append_new_column(new_feature);
+
+    int lines = 0;
+
     // read one line in the file per loop
-    while (fscanf(actual_file_, "%d %d %d %f", &chrom, &chrom_begin, &chrom_end, &peak) != EOF) {
+    while (fscanf(actual_file_, "%s %d %d %f", chrom, &chrom_begin, &chrom_end, &peak) == 4) {
 
-        cout << "line read" << endl;
+        lines++;
+        cerr << lines << endl;
+        if (map_str_to_chr_.find(chrom) != map_str_to_chr_.end()) {
+
+            chromosome = map_str_to_chr_[chrom];
+        } else {
+
+            map_str_to_chr_[chrom] = chrom_numerical_;
+            map_chr_to_str_[chrom_numerical_] = chrom;
+            chromosome = chrom_numerical_++;
+        }
         // store just read data in matrix
-        store_data(chrom, chrom_begin, chrom_end, peak, data_type);
+        binary_search(chromosome, chrom_begin, chrom_end, 0, line_counter_ - 1, data_type, peak);
 
+    }
+
+    if (!feof(actual_file_)) {
+
+        fprintf(stderr, ("\nA reading error occured while reading \"" + file_path  + "\"\n").c_str());
     }
 
     fclose(actual_file_);
@@ -133,20 +151,66 @@ void Reader::read_file(const string& file_path, int data_type) {
 
 void Reader::read_peak_file(const string& file_path) {
 
-    has_peak_file_ = true;
+
+    // adapt this for faster peak file reading
+    // it should be bigger then the actual number of lines in the file
+    constexpr int INITIAL_V_CAP = 70000;
+    constexpr int V_CAP_STEPSIZE = 10000;
+
+    // actual capabilty of one column
+    int actually_reserved = INITIAL_V_CAP;
+
     FILE* peak_file = fopen (file_path.c_str(), "r");
 
-    int chrom, chrom_begin, chrom_end;
+    char chrom[50];
+    int chromosome, chrom_begin, chrom_end;
+
+    // initialize and reserve memory for peak file values
+    vector<float> chromosome_v;
+    chromosome_v.reserve(INITIAL_V_CAP);
+    vector<float> chrom_begin_v;
+    chrom_begin_v.reserve(INITIAL_V_CAP);
+    vector<float> chrom_end_v;
+    chrom_end_v.reserve(INITIAL_V_CAP);
+
+    matrix_.append_new_column(chromosome_v);
+    matrix_.append_new_column(chrom_begin_v);
+    matrix_.append_new_column(chrom_end_v);
 
     // read one line in the file per loop
-    while (fscanf(peak_file, "%d %d %d", &chrom, &chrom_begin, &chrom_end) != EOF) {
+    // skip the additional information of broadpeak format
+    while (fscanf(peak_file, "%s %d %d %*s %*s %*s %*s %*s %*s", chrom, &chrom_begin, &chrom_end) == 3) {
 
-        vector<float> new_data(number_of_data_types_ + 3, 0);
-        new_data[0] = chrom;
-        new_data[1] = chrom_begin;
-        new_data[2] = chrom_end;
-        matrix_.append_new_line(new_data);
+        ++line_counter_;
+        cerr << line_counter_ << "\n\n";
+        if (map_str_to_chr_.find(chrom) != map_str_to_chr_.end()) {
 
+            chromosome = map_str_to_chr_[chrom];
+        } else {
+
+            map_str_to_chr_[chrom] = chrom_numerical_;
+            map_chr_to_str_[chrom_numerical_] = chrom;
+            chromosome = chrom_numerical_++;
+        }
+
+        // if necessary allocate more memory for matrix columns
+        if (line_counter_ > actually_reserved) {
+
+            matrix_.get_column(0).reserve(actually_reserved + V_CAP_STEPSIZE);
+            matrix_.get_column(1).reserve(actually_reserved + V_CAP_STEPSIZE);
+            matrix_.get_column(2).reserve(actually_reserved + V_CAP_STEPSIZE);
+            actually_reserved += V_CAP_STEPSIZE;
+        }
+
+        matrix_.get_column(0).push_back(chromosome);
+        matrix_.get_column(1).push_back(chrom_begin);
+        matrix_.get_column(2).push_back(chrom_end);
+
+    }
+
+    if (!feof(peak_file)) {
+
+        fprintf(stderr, ("\nA reading error occured while reading peak file \"" + file_path  + "\"\n").c_str());
     }
 
     fclose(peak_file);
@@ -156,147 +220,166 @@ void Reader::read_peak_file(const string& file_path) {
 
 
 
+void Reader::print_prev_read_data(ostream& os) {
+
+
+    os << endl << endl;
+    if (matrix_.get_number_of_lines() == 0) {
+
+        os << "<Empty>" << endl;
+    } else {
+
+        if (matrix_.get_number_of_columns() == 0) {
+
+            os << "<Empty>" << endl;
+        }
+    }
+
+    // iterate over lines
+    for (int lines = 0; lines < matrix_.get_number_of_lines(); ++lines) {
+
+
+        os << setw(10) << right << map_chr_to_str_[matrix_(lines, 0)] << "\t";
+        // iterate over columns
+        for (int columns = 1; columns < matrix_.get_number_of_columns(); ++columns) {
+
+            os << setw(5) << right << matrix_(lines, columns) << "\t";
+        }
+        os << "\n";
+    }
+}
+
+
+
+
+
 Matrix<float>& Reader::get_prev_read_data() {
 
     return matrix_;
-
 }
 
 
 
 
 
-void Reader::store_data(const int chrom, const int chrom_begin, const int chrom_end, const float peak, const int data_type) {
-
-    // checks if chromosome region has been read before
-    //   if not -> insert new matrix line holding the data
-    if (matrix_.get_number_of_lines() == 0) {
-
-        vector<float> new_data(number_of_data_types_ + 3, 0);
-        new_data[0] = chrom;
-        new_data[1] = chrom_begin;
-        new_data[2] = chrom_end;
-        new_data[data_type + 3] = peak;
-        matrix_.append_new_line(new_data);
-
-    } else if (chrom_begin > (*(matrix_.last_line()))[2] && chrom >= (*(matrix_.last_line()))[0]) {
-
-        if (!has_peak_file_) {
-
-            vector<float> new_data(number_of_data_types_ + 3, 0);
-            new_data[0] = chrom;
-            new_data[1] = chrom_begin;
-            new_data[2] = chrom_end;
-            new_data[data_type + 3] = peak;
-            matrix_.append_new_line(new_data);
-        }
-
-    // else do ovelarp computation
-    } else {
-
-        binary_search(chrom, chrom_begin, chrom_end, last_found_pos_, data_type, peak);
-    }
-}
+void Reader::binary_search(const int chrom, const int chrom_begin, const int chrom_end, const int start_point, const int end_point, const int data_type, const float peak) {
 
 
+    // termination
+    if (start_point > end_point) {
 
-
-
-void Reader::binary_search(const int chrom, const int chrom_begin, const int chrom_end, const int starting_point, const int data_type, const float peak) {
-
-
-    // if starting point is below zero -> prepend new line
-    // or
-    // if starting point is greater then the actual number of lines -> append new line
-    if (starting_point < 0 || starting_point >= matrix_.get_number_of_lines()) {
-
-        vector<float> new_line (number_of_data_types_ + 3, 0);
-        new_line[0] = chrom;
-        new_line[1] = chrom_begin;
-        new_line[2] = chrom_end;
-        new_line[data_type + 3] = peak;
-
-        last_found_it_ = matrix_.insert_new_line(starting_point, new_line);
-        last_found_pos_ = 0;
-        // reset binary search rememberer
-        gone_left = false;
-        gone_right = false;
         return;
     }
 
-    // if insertion is needed use last found line as origin for iterator finding
-    // for better perfomance
-    auto start_it = last_found_it_;
+    // center of one vector
+    const int central_point = start_point + ((end_point - start_point) / 2);
 
-    // find iterator for matrix[starting_point]
-    if (starting_point >= last_found_pos_) {
+    // tests if queue is on the same chromosome as new sample
+    if (matrix_(central_point, 0) == chrom) {
 
-        for (int i = 0; starting_point > last_found_pos_ + i; ++i) {
+        // region overlap tests between queue and sample
+        if (matrix_(central_point, 1) >= chrom_begin) {
 
-            ++start_it;
-        }
-    } else {
-
-        for (int i = 0; starting_point < last_found_pos_ - i; ++i) {
-
-            --start_it;
-        }
-    }
-
-
-    if (matrix_(start_it, 0) == chrom) {
-
-        // region overlap tests
-        if (matrix_(start_it, 1) >= chrom_begin) {
-
-            if (matrix_(start_it, 1) == chrom_begin) {
+            if (matrix_(central_point, 1) == chrom_begin) {
 
                 // sample:  |---|
                 // queue:   |---|
                 //  or
                 // sample:  |--|
                 // queue:   |---|
-                if (matrix_(start_it, 2) >= chrom_end) {
+                if (matrix_(central_point, 2) >= chrom_end) {
 
-                    matrix_(start_it, data_type + 3) += peak;
-                    last_found_pos_ = starting_point;
-                    last_found_it_ = start_it;
+                    matrix_(central_point, data_type + 3) += peak;
 
                 // sample: |----|
                 // queue:  |---|
                 } else {
 
                     // peak value that overlaps with the queue
-                    const float partial_peak = (float)(matrix_(start_it, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
-                    matrix_(start_it, data_type + 3) += partial_peak;
-                    last_found_pos_ = starting_point;
-                    last_found_it_ = start_it;
-                    // start binary search for the rest of the sample
-                    binary_search(chrom, matrix_(start_it, 2), chrom_end, starting_point + 1, data_type, peak - partial_peak);
+                    float partial_peak = (float)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
+                    matrix_(central_point, data_type + 3) += partial_peak;
+
+                    // increase position in each step by one
+                    int i = 1;
+                    int mod_start = matrix_(central_point, 2);
+
+                    while (matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
+
+                        if (matrix_(central_point + i, 2) >= chrom_end) {
+
+                            partial_peak = (float)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak;
+                            matrix_(central_point, data_type + 3) += partial_peak;
+                            break;
+
+                        } else {
+
+                            partial_peak = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak;
+                            matrix_(central_point, data_type + 3) += partial_peak;
+                            mod_start = matrix_(central_point + i, 2);
+                            ++i;
+                        }
+                    }
                 }
 
-            // matrix(start_it, 1) > chrom_begin
+            // matrix(central_point, 1) > chrom_begin
             } else {
 
-                if (matrix_(start_it, 1) <= chrom_end) {
+                if (matrix_(central_point, 1) < chrom_end) {
 
                     // sample:  |---|
                     // queue:    |-|
-                    if (matrix_(start_it, 2) < chrom_end) {
+                    if (matrix_(central_point, 2) < chrom_end) {
 
                         // peak value that overlaps with the queue
-                        const float partial_peak = (float)(matrix_(start_it, 2) - matrix_(start_it, 1))/(chrom_end - chrom_begin) * peak;
-                        matrix_(start_it, data_type + 3) += partial_peak;
-                        last_found_pos_ = starting_point;
-                        last_found_it_ = start_it;
+                        const float partial_peak = (float)(matrix_(central_point, 2) - matrix_(central_point, 1))/(chrom_end - chrom_begin) * peak;
+                        matrix_(central_point, data_type + 3) += partial_peak;
 
                         // start binary seach for remaining left and right part of the sample
-                        const float partial_peak_left = (float)(matrix_(start_it, 1) - chrom_begin)/(chrom_end - chrom_begin) * peak;
+                        float partial_peak_left = (float)(matrix_(central_point, 1) - chrom_begin)/(chrom_end - chrom_begin) * peak;
 
-                        binary_search(chrom, chrom_begin, matrix_(start_it, 1) - 1, starting_point - 1, data_type, partial_peak_left);
+                        int i = 1;
+                        int mod_end = matrix_(central_point, 1);
 
-                        const float partial_peak_right = (float)(chrom_end - matrix_(start_it, 2))/(chrom_end - chrom_begin) * peak;
-                        binary_search(chrom, matrix_(start_it, 2), chrom_end, starting_point + 1, data_type, partial_peak_right);
+                        while (matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 2) > chrom_begin) {
+
+                            if (matrix_(central_point + i, 1) <= chrom_begin) {
+
+                                partial_peak_left = (float)(matrix_(central_point + i, 2) - chrom_begin)/(mod_end - chrom_begin) * partial_peak_left;
+                                matrix_(central_point, data_type + 3) += partial_peak_left;
+                                break;
+
+                            } else {
+
+                                partial_peak_left = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(mod_end - chrom_begin) * partial_peak_left;
+                                matrix_(central_point, data_type + 3) += partial_peak_left;
+                                mod_end = matrix_(central_point + i, 1);
+                                ++i;
+                            }
+                        }
+
+
+                        float partial_peak_right = (float)(chrom_end - matrix_(central_point, 2))/(chrom_end - chrom_begin) * peak;
+
+                        i = 1;
+                        int mod_start = matrix_(central_point, 2);
+
+                        while (matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
+
+                            if (matrix_(central_point + i, 2) >= chrom_end) {
+
+                                partial_peak_right = (float)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_right;
+                                matrix_(central_point, data_type + 3) += partial_peak_right;
+                                break;
+
+                            } else {
+
+                                partial_peak_right = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_right;
+                                matrix_(central_point, data_type + 3) += partial_peak_right;
+                                mod_start = matrix_(central_point + i, 2);
+                                ++i;
+                            }
+                        }
+
 
                     // sample:  |----|
                     // queue:     |---|
@@ -309,79 +392,49 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                     } else {
 
                         // peak value that overlaps with the queue
-                        const float partial_peak = (float)(chrom_end - matrix_(start_it, 1))/(chrom_end - chrom_begin) * peak;
-                        matrix_(start_it, data_type + 3) += partial_peak;
-                        last_found_pos_ = starting_point;
-                        last_found_it_ = start_it;
-                        // binary search for remaining peak of the sample
-                        binary_search(chrom, chrom_begin, matrix_(start_it, 1), starting_point - 1, data_type, peak - partial_peak);
+                        float partial_peak = (float)(chrom_end - matrix_(central_point, 1))/(chrom_end - chrom_begin) * peak;
+                        matrix_(central_point, data_type + 3) += partial_peak;
 
+                        int i = 1;
+                        int mod_end = matrix_(central_point, 1);
+
+                        while (matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 2) > chrom_begin) {
+
+                            if (matrix_(central_point + i, 1) <= chrom_begin) {
+
+                                partial_peak = (float)(matrix_(central_point + i, 2) - chrom_begin)/(mod_end - chrom_begin) * partial_peak;
+                                matrix_(central_point, data_type + 3) += partial_peak;
+                                break;
+
+                            } else {
+
+                                partial_peak = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(mod_end - chrom_begin) * partial_peak;
+                                matrix_(central_point, data_type + 3) += partial_peak;
+                                mod_end = matrix_(central_point + i, 1);
+                                ++i;
+                            }
+                        }
                     }
 
                 // sample: |---|
                 // queue:        |---|
                 } else {
 
-                    // real binary search
-                    const int starting_point_shift = (starting_point + 1) / 2;
-                    // if binary search not finished
-                    if (starting_point_shift > 0 && !gone_right) {
-
-                        starting_point_shift == 1 ? gone_left = true : 0;
-                        binary_search(chrom, chrom_begin, chrom_end, starting_point - starting_point_shift, data_type, peak);
-
-                    // else insert new element at actual position
-                    } else {
-
-                        if (!has_peak_file_) {
-
-                            vector<float> new_line (number_of_data_types_ + 3, 0);
-                            new_line[0] = chrom;
-                            new_line[1] = chrom_begin;
-                            new_line[2] = chrom_end;
-                            new_line[data_type + 3] = peak;
-
-                            last_found_it_ = matrix_.insert_new_line(start_it, new_line);
-                            last_found_pos_ = starting_point;
-                        }
-                    }
+                    binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak);
                 }
 
             }
 
-        // matrix_(start_it, 1) < chrom_begin
+        // matrix_(central_point, 1) < chrom_begin
         } else {
 
             // sample:        |---|
             // queue:   |---|
-            if (matrix_(start_it, 2) <= chrom_begin) {
+            if (matrix_(central_point, 2) <= chrom_begin) {
 
+                binary_search(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, peak);
 
-                const int starting_point_shift = (matrix_.get_number_of_lines() - starting_point) / 2;
-                // if binary search not finished
-                if (starting_point_shift > 0 && !gone_left) {
-
-                    starting_point_shift == 1 ? gone_right = true : 0;
-                    binary_search(chrom, chrom_begin, chrom_end, starting_point + starting_point_shift, data_type, peak);
-
-                // else insert new element at actual position
-                } else {
-
-                    if (!has_peak_file_) {
-
-                        vector<float> new_line (number_of_data_types_ + 3, 0);
-                        new_line[0] = chrom;
-                        new_line[1] = chrom_begin;
-                        new_line[2] = chrom_end;
-                        new_line[data_type + 3] = peak;
-
-                        last_found_it_ = matrix_.insert_new_line(++start_it, new_line);
-                        last_found_pos_ = starting_point + 1;
-                    }
-                }
-
-
-            // matrix_(start_it, 2) > chrom_begin
+            // matrix_(central_point, 2) > chrom_begin
             } else {
 
                 // sample:   |--|
@@ -389,23 +442,37 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 //  or
                 // sample:   |--|
                 // queue:  |------|
-                if (matrix_(start_it, 2) >= chrom_end) {
+                if (matrix_(central_point, 2) >= chrom_end) {
 
-                    matrix_(start_it, data_type + 3) += peak;
-                    last_found_pos_ = starting_point;
-                    last_found_it_ = start_it;
+                    matrix_(central_point, data_type + 3) += peak;
 
                 // sample:   |---|
                 // queue:  |---|
                 } else {
 
                     // peak value that overlaps with the queue
-                    const float partial_peak = (float)(matrix_(start_it, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
-                    matrix_(start_it, data_type + 3) += partial_peak;
-                    last_found_pos_ = starting_point;
-                    last_found_it_ = start_it;
-                    // binary search for all bits except the one that overlaps
-                    binary_search(chrom, matrix_(start_it, 2), chrom_end, starting_point + 1, data_type, peak - partial_peak);
+                    float partial_peak = (float)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
+                    matrix_(central_point, data_type + 3) += partial_peak;
+
+                    int i = 1;
+                    int mod_start = matrix_(central_point, 2);
+
+                    while (matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
+
+                        if (matrix_(central_point + i, 2) >= chrom_end) {
+
+                            partial_peak = (float)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak;
+                            matrix_(central_point, data_type + 3) += partial_peak;
+                            break;
+
+                        } else {
+
+                            partial_peak = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak;
+                            matrix_(central_point, data_type + 3) += partial_peak;
+                            mod_start = matrix_(central_point + i, 2);
+                            ++i;
+                        }
+                    }
 
                 }
             }
@@ -415,63 +482,15 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
 
         // sample:        |---|
         // queue:   |---|
-        if (matrix_(start_it, 0) < chrom) {
+        if (matrix_(central_point, 0) < chrom) {
 
-            const int starting_point_shift = (matrix_.get_number_of_lines() - starting_point) / 2;
-            // if binary search not finished
-            if (starting_point_shift > 0 && !gone_left) {
-
-                starting_point_shift == 1 ? gone_right = true : 0;
-                binary_search(chrom, chrom_begin, chrom_end, starting_point + starting_point_shift, data_type, peak);
-
-            // else insert new element at actual position
-            } else {
-
-                if (!has_peak_file_) {
-
-                    vector<float> new_line (number_of_data_types_ + 3, 0);
-                    new_line[0] = chrom;
-                    new_line[1] = chrom_begin;
-                    new_line[2] = chrom_end;
-                    new_line[data_type + 3] = peak;
-
-                    last_found_it_ = matrix_.insert_new_line(++start_it, new_line);
-                    last_found_pos_ = starting_point + 1;
-                }
-            }
+            binary_search(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, peak);
 
         // sample:  |---|
         // queue:         |---|
         } else {
 
-            // real binary search
-            const int starting_point_shift = (starting_point + 1) / 2;
-            // if binary search not finished
-            if (starting_point_shift > 0 && !gone_right) {
-
-                starting_point_shift == 1 ? gone_left = true : 0;
-                binary_search(chrom, chrom_begin, chrom_end, starting_point - starting_point_shift, data_type, peak);
-
-            // else insert new element at actual position
-            } else {
-
-                if (!has_peak_file_) {
-
-                    vector<float> new_line (number_of_data_types_ + 3, 0);
-                    new_line[0] = chrom;
-                    new_line[1] = chrom_begin;
-                    new_line[2] = chrom_end;
-                    new_line[data_type + 3] = peak;
-
-                    last_found_it_ = matrix_.insert_new_line(start_it, new_line);
-                    last_found_pos_ = starting_point;
-                }
-            }
+            binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak);
         }
     }
-
-    // reset binary search rememberer
-    gone_left = false;
-    gone_right = false;
-
 }
