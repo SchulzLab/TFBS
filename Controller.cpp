@@ -6,7 +6,7 @@
 #include "Controller.h"
 #include "libsvm_interface.h"
 
-
+using namespace std;
 
 
 // ###################### MAIN #########################
@@ -62,7 +62,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     for (int i = 0; i < argc; ++i) {
 
         // note: strcmp returns 0 if strings are equal
-        !strcmp(argv[i], "-f") || !strcmp(argv[i], "-d") ? ++number_of_data_types_ : 0;
+        !strcmp(argv[i], "-f") ? ++number_of_data_types_ : 0;
 
         if (!strcmp(argv[i], "-p")) {
 
@@ -151,7 +151,23 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     int i = optind;
     for (int counter = 0; i < argc; ++i, ++counter) {
 
+        if (counter >= files_.size()) {
+
+            fprintf(stderr, "Too many column descriptions provided.\n");
+            exit(EXIT_FAILURE);
+        }
         data_type_names_[counter] = argv[i];
+    }
+
+    int counter = 0;
+    for (string file_name : files_) {
+
+        // if no name is provided set column description to given file path
+        if (data_type_names_[counter] == "<>") {
+
+            data_type_names_[counter] = file_name;
+        }
+        ++counter;
     }
 
 
