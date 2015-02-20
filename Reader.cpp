@@ -31,6 +31,7 @@ Reader::Reader(int number_of_data_types) :
     ,   number_of_data_types_(number_of_data_types)
     ,   actual_file_(NULL)
     ,   line_counter_(0)
+    ,   chrom_numerical_(0)
 {
 }
 
@@ -42,8 +43,13 @@ Reader::Reader(Reader&& other_reader) :
         matrix_(move(other_reader.matrix_))
     ,   number_of_data_types_(other_reader.number_of_data_types_)
     ,   actual_file_(other_reader.actual_file_)
+    ,   map_str_to_chr_(other_reader.map_str_to_chr_)
+    ,   map_chr_to_str_(other_reader.map_chr_to_str_)
+    ,   chrom_numerical_(other_reader.chrom_numerical_)
 {
     other_reader.matrix_ = Matrix<float>();
+    other_reader.map_str_to_chr_ = unordered_map<string, int>();
+    other_reader.map_chr_to_str_ = unordered_map<int, string>();
 }
 
 
@@ -55,6 +61,9 @@ Reader& Reader::operator=(Reader&& other_reader){
     matrix_ = move(other_reader.matrix_);
     number_of_data_types_ = other_reader.number_of_data_types_;
     actual_file_ = other_reader.actual_file_;
+    map_str_to_chr_ = move(other_reader.map_str_to_chr_);
+    map_chr_to_str_ = move(other_reader.map_chr_to_str_);
+    chrom_numerical_ = other_reader.chrom_numerical_;
 
     return *this;
 }
@@ -97,8 +106,10 @@ void Reader::read_file(const string& file_path, int data_type) {
 
     actual_file_ = fopen (file_path.c_str(), "r");
 
+
     // variables holding the content of one line of the file temporarily
-    int chrom_begin, chrom_end, chrom;
+    int chrom_begin, chrom_end, chromosome;
+    char chrom[50];
     float peak;
 
     vector<float> new_feature(line_counter_, .0);
@@ -108,12 +119,21 @@ void Reader::read_file(const string& file_path, int data_type) {
     int lines = 0;
 
     // read one line in the file per loop
-    while (fscanf(actual_file_, "%d %d %d %f", &chrom, &chrom_begin, &chrom_end, &peak) == 4) {
+    while (fscanf(actual_file_, "%s %d %d %f", chrom, &chrom_begin, &chrom_end, &peak) == 4) {
 
         lines++;
         cerr << lines << endl;
+        if (map_str_to_chr_.find(chrom) != map_str_to_chr_.end()) {
+
+            chromosome = map_str_to_chr_[chrom];
+        } else {
+
+            map_str_to_chr_[chrom] = chrom_numerical_;
+            map_chr_to_str_[chrom_numerical_] = chrom;
+            chromosome = chrom_numerical_++;
+        }
         // store just read data in matrix
-        binary_search(chrom, chrom_begin, chrom_end, 0, line_counter_ - 1, data_type, peak);
+        binary_search(chromosome, chrom_begin, chrom_end, 0, line_counter_ - 1, data_type, peak);
 
     }
 
@@ -142,7 +162,8 @@ void Reader::read_peak_file(const string& file_path) {
 
     FILE* peak_file = fopen (file_path.c_str(), "r");
 
-    int chrom, chrom_begin, chrom_end;
+    char chrom[50];
+    int chromosome, chrom_begin, chrom_end;
 
     // initialize and reserve memory for peak file values
     vector<float> chromosome_v;
@@ -158,10 +179,20 @@ void Reader::read_peak_file(const string& file_path) {
 
     // read one line in the file per loop
     // skip the additional information of broadpeak format
-    while (fscanf(peak_file, "%d %d %d %*s %*s %*s %*s %*s %*s", &chrom, &chrom_begin, &chrom_end) == 3) {
+    while (fscanf(peak_file, "%s %d %d %*s %*s %*s %*s %*s %*s", chrom, &chrom_begin, &chrom_end) == 3) {
 
         ++line_counter_;
         cerr << line_counter_ << "\n\n";
+        if (map_str_to_chr_.find(chrom) != map_str_to_chr_.end()) {
+
+            chromosome = map_str_to_chr_[chrom];
+        } else {
+
+            map_str_to_chr_[chrom] = chrom_numerical_;
+            map_chr_to_str_[chrom_numerical_] = chrom;
+            chromosome = chrom_numerical_++;
+        }
+
         // if necessary allocate more memory for matrix columns
         if (line_counter_ > actually_reserved) {
 
@@ -171,7 +202,7 @@ void Reader::read_peak_file(const string& file_path) {
             actually_reserved += V_CAP_STEPSIZE;
         }
 
-        matrix_.get_column(0).push_back(chrom);
+        matrix_.get_column(0).push_back(chromosome);
         matrix_.get_column(1).push_back(chrom_begin);
         matrix_.get_column(2).push_back(chrom_end);
 
@@ -189,10 +220,42 @@ void Reader::read_peak_file(const string& file_path) {
 
 
 
+void Reader::print_prev_read_data(ostream& os) {
+
+
+    os << endl << endl;
+    if (matrix_.get_number_of_lines() == 0) {
+
+        os << "<Empty>" << endl;
+    } else {
+
+        if (matrix_.get_number_of_columns() == 0) {
+
+            os << "<Empty>" << endl;
+        }
+    }
+
+    // iterate over lines
+    for (int lines = 0; lines < matrix_.get_number_of_lines(); ++lines) {
+
+
+        os << setw(10) << right << map_chr_to_str_[matrix_(lines, 0)] << "\t";
+        // iterate over columns
+        for (int columns = 1; columns < matrix_.get_number_of_columns(); ++columns) {
+
+            os << setw(5) << right << matrix_(lines, columns) << "\t";
+        }
+        os << "\n";
+    }
+}
+
+
+
+
+
 Matrix<float>& Reader::get_prev_read_data() {
 
     return matrix_;
-
 }
 
 

@@ -41,7 +41,7 @@ Controller::Controller() :
 
 Controller::~Controller() {
 
-    svm_free_and_destroy_model(&svm_);
+    // svm_free_and_destroy_model(&svm_);
 }
 
 
@@ -194,7 +194,7 @@ void Controller::print_prev_read_data(ostream& os) {
         os << data_type_names_[i] << "\t";
     }
     os << endl << endl;
-    os << reader_class_.get_prev_read_data();
+    reader_class_.print_prev_read_data(os);
 }
 
 

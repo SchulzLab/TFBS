@@ -4,6 +4,7 @@
 #include <string>
 #include <stdio.h> // fscanf
 #include <utility> // pair
+#include <unordered_map>
 
 #include "svm.h"   // struct svm_node
 #include "Matrix.h"
@@ -50,6 +51,7 @@ class Reader
 
         // get matrix - i.e. get previously read data
         Matrix<float>& get_prev_read_data();
+        void print_prev_read_data(ostream& os);
 
         // get data in libSVM format
         //
@@ -97,6 +99,13 @@ class Reader
         // counts the number of lines given by a peak file
         // required for efficient allocation of memory for new features
         long line_counter_;
+
+        // maps for accessing intern numerical values for chromsomes in matrix
+        unordered_map<string, int> map_str_to_chr_;
+        unordered_map<int, string> map_chr_to_str_;
+
+        // internal counter for numerical values representing chromosomes in matrix
+        int chrom_numerical_;
 };
 
 #endif /* READER_H */
