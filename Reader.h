@@ -93,9 +93,6 @@ class Reader
         // i.e. number of columns in matrix_
         int number_of_data_types_;
 
-        // file on which the reader actually works on
-        FILE* actual_file_;
-
         // counts the number of lines given by a peak file
         // required for efficient allocation of memory for new features
         long line_counter_;

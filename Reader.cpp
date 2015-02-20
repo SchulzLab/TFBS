@@ -17,7 +17,6 @@ using namespace std;
 Reader::Reader() :
         matrix_()
     ,   number_of_data_types_(0)
-    ,   actual_file_(NULL)
     ,   line_counter_(0)
 {
 }
@@ -29,7 +28,6 @@ Reader::Reader() :
 Reader::Reader(int number_of_data_types) :
         matrix_()
     ,   number_of_data_types_(number_of_data_types)
-    ,   actual_file_(NULL)
     ,   line_counter_(0)
     ,   chrom_numerical_(0)
 {
@@ -42,7 +40,6 @@ Reader::Reader(int number_of_data_types) :
 Reader::Reader(Reader&& other_reader) :
         matrix_(move(other_reader.matrix_))
     ,   number_of_data_types_(other_reader.number_of_data_types_)
-    ,   actual_file_(other_reader.actual_file_)
     ,   map_str_to_chr_(other_reader.map_str_to_chr_)
     ,   map_chr_to_str_(other_reader.map_chr_to_str_)
     ,   chrom_numerical_(other_reader.chrom_numerical_)
@@ -60,7 +57,6 @@ Reader& Reader::operator=(Reader&& other_reader){
 
     matrix_ = move(other_reader.matrix_);
     number_of_data_types_ = other_reader.number_of_data_types_;
-    actual_file_ = other_reader.actual_file_;
     map_str_to_chr_ = move(other_reader.map_str_to_chr_);
     map_chr_to_str_ = move(other_reader.map_chr_to_str_);
     chrom_numerical_ = other_reader.chrom_numerical_;
@@ -104,7 +100,7 @@ Reader& Reader::operator=(Reader&& other_reader){
 
 void Reader::read_file(const string& file_path, int data_type) {
 
-    actual_file_ = fopen (file_path.c_str(), "r");
+    FILE* actual_file = fopen (file_path.c_str(), "r");
 
 
     // variables holding the content of one line of the file temporarily
@@ -119,7 +115,7 @@ void Reader::read_file(const string& file_path, int data_type) {
     int lines = 0;
 
     // read one line in the file per loop
-    while (fscanf(actual_file_, "%s %d %d %f", chrom, &chrom_begin, &chrom_end, &peak) == 4) {
+    while (fscanf(actual_file, "%s %d %d %f", chrom, &chrom_begin, &chrom_end, &peak) == 4) {
 
         lines++;
         cerr << lines << endl;
@@ -137,12 +133,12 @@ void Reader::read_file(const string& file_path, int data_type) {
 
     }
 
-    if (!feof(actual_file_)) {
+    if (!feof(actual_file)) {
 
         fprintf(stderr, ("\nA reading error occured while reading \"" + file_path  + "\"\n").c_str());
     }
 
-    fclose(actual_file_);
+    fclose(actual_file);
 }
 
 
@@ -186,11 +182,6 @@ void Reader::read_peak_file(const string& file_path) {
         if (map_str_to_chr_.find(chrom) != map_str_to_chr_.end()) {
 
             chromosome = map_str_to_chr_[chrom];
-        } else {
-
-            map_str_to_chr_[chrom] = chrom_numerical_;
-            map_chr_to_str_[chrom_numerical_] = chrom;
-            chromosome = chrom_numerical_++;
         }
 
         // if necessary allocate more memory for matrix columns
