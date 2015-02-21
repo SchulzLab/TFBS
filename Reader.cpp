@@ -122,14 +122,12 @@ void Reader::read_file(const string& file_path, int data_type) {
         if (map_str_to_chr_.find(chrom) != map_str_to_chr_.end()) {
 
             chromosome = map_str_to_chr_[chrom];
+
         } else {
 
-            map_str_to_chr_[chrom] = chrom_numerical_;
-            map_chr_to_str_[chrom_numerical_] = chrom;
-            chromosome = chrom_numerical_++;
+            // store just read data in matrix
+            binary_search(chromosome, chrom_begin, chrom_end, 0, line_counter_ - 1, data_type, peak);
         }
-        // store just read data in matrix
-        binary_search(chromosome, chrom_begin, chrom_end, 0, line_counter_ - 1, data_type, peak);
 
     }
 
@@ -182,6 +180,12 @@ void Reader::read_peak_file(const string& file_path) {
         if (map_str_to_chr_.find(chrom) != map_str_to_chr_.end()) {
 
             chromosome = map_str_to_chr_[chrom];
+
+        } else {
+
+            map_str_to_chr_[chrom] = chrom_numerical_;
+            map_chr_to_str_[chrom_numerical_] = chrom;
+            chromosome = chrom_numerical_++;
         }
 
         // if necessary allocate more memory for matrix columns
