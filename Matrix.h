@@ -127,7 +127,7 @@ template <typename T> Matrix<T>& Matrix<T>::operator=(Matrix&& M) {
 
 template <typename T> int Matrix<T>::get_number_of_lines() {
 
-    return matrix_[0].size();
+    return matrix_.size() > 0 ? matrix_[0].size() : 0;
 }
 
 
