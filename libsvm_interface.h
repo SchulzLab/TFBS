@@ -16,8 +16,32 @@ struct svm_problem* construct_svm_problem(Matrix<float>& positive_data, Matrix<f
 
 // initialize parameters for SVM in syntax of libSVM
 //
+// @param: rbf_gamma - kernel parameter (we use a RBF kernel)
+//         svm_c     - slack variable
+//
 // @return: svm_param in libSVM struct
-struct svm_parameter* construct_svm_param();
+//
+struct svm_parameter* construct_svm_param(double rbf_gamma, double svm_c);
+
+
+// train best set of parameters by using k-fold cross validation
+//
+// @param: prob - problem to solve
+//
+// @return: the best found parameter set
+//
+struct svm_parameter* train_params(const struct svm_problem* prob);
+
+
+// get distance between a given problem and (by cross validation) predicted labels
+// if predicted label differ from real label distance is increased by 1
+//
+// @param: prob - libSVM problem on which cross validation was executed
+//         predicted - cross validation output
+//
+// @return: computed distance
+//
+int labelset_distance(const struct svm_problem* prob, const double* predicted);
 
 
 #endif /* LIBSVM_INTERFACE_H */
