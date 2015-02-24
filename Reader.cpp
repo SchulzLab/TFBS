@@ -123,12 +123,10 @@ void Reader::read_file(const string& file_path, int data_type) {
 
             chromosome = map_str_to_chr_[chrom];
 
-        } else {
-
             // store just read data in matrix
             binary_search(chromosome, chrom_begin, chrom_end, 0, line_counter_ - 1, data_type, peak);
-        }
 
+        }
     }
 
     if (!feof(actual_file)) {
@@ -174,6 +172,7 @@ void Reader::read_peak_file(const string& file_path) {
     // read one line in the file per loop
     // skip the additional information of broadpeak format
     while (fscanf(peak_file, "%s %d %d %*s %*s %*s %*s %*s %*s", chrom, &chrom_begin, &chrom_end) == 3) {
+
 
         ++line_counter_;
         cerr << line_counter_ << "\n\n";
