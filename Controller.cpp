@@ -3,6 +3,10 @@
 #include <unistd.h>    // getopt
 #include <stdlib.h>    // exit
 
+// #ifdef _OPENMP
+// #include <omp.h>
+// #endif
+
 #include "Controller.h"
 #include "libsvm_interface.h"
 
@@ -17,6 +21,9 @@ int main(int argc, char* argv[]) {
 
     controller.parse_arguments(argc, argv);
     controller.print_prev_read_data(cout);
+
+    controller.build_svm_model();
+
     return 0;
 }
 
@@ -41,7 +48,8 @@ Controller::Controller() :
 
 Controller::~Controller() {
 
-    // svm_free_and_destroy_model(&svm_);
+    svm_free_model_content(svm_);
+    svm_free_and_destroy_model(&svm_);
 }
 
 
@@ -171,11 +179,14 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     }
 
 
+    vector<string> files_buffer{begin(files_), end(files_)};
     // read files
+// #ifdef _OPENMP
+// #pragma omp parallel for
+// #endif
     for (int counter = 0; counter < number_of_data_types_; ++counter) {
 
-        reader_class_.read_file(files_.front(), counter);
-        files_.pop_front();
+        reader_class_.read_file(files_buffer[counter], counter);
     }
 }
 
@@ -202,18 +213,18 @@ void Controller::print_prev_read_data(ostream& os) {
 
 void Controller::build_svm_model() {
 
-    // Dummy
-    Matrix<float> m_neg;
-    struct svm_problem* prob = construct_svm_problem(reader_class_.get_prev_read_data(),/*TODO build negative cases*/m_neg);
-    svm_parameter* params = construct_svm_param();
+    Matrix<float> m = Matrix<float>();
+    struct svm_problem* prob = construct_svm_problem(reader_class_.get_prev_read_data(), m);
 
-    // check parameters
-    const char* errormessage = svm_check_parameter(prob, params);
+    struct svm_parameter* params = train_params(prob);
 
-    if (errormessage != NULL) {
-
-        fprintf(stderr, errormessage);
-    }
+    // check parameters doesn't make sense since you must init all values of params which is cluelsess
+    // const char* errormessage = svm_check_parameter(prob, params);
+    //
+    // if (errormessage != NULL) {
+    //
+    //     fprintf(stderr, errormessage);
+    // }
 
     // train actual model
     svm_ = svm_train(prob, params);
