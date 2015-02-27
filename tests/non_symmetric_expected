@@ -1,0 +1,5 @@
+chrom   gen_start   gen_end Typ1
+chr1    0   5   5
+chr1    5   15  10
+chr1    15  20  2
+chr2    7   15  6

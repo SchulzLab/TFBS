@@ -1,0 +1,4 @@
+gen     gen_start   gen_end     Typ1    Typ2
+chrom1  0   5   1   0
+chrom2  10  20  0   0.5
+.Ne3    5   10  1   2
