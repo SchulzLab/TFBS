@@ -44,6 +44,8 @@ class Controller {
 
         // files to read
         list<string> files_;
+        // says if file (corresponding entry in files) contains log ratio (TRUE) or normal (FALSE) values
+        list<bool> log_ratio_;
 
         // corresponding names for the data type (e.g. "DNAse" "Histone_mod")
         vector<string> data_type_names_;

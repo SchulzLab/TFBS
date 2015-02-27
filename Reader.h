@@ -42,7 +42,8 @@ class Reader
         //
         // @param: path to a file to read
         //         corresponding column in matrix_ for the type of data in the file
-        void read_file(const string& file_path, int data_type);
+        //         boolean if peaks in file are log ratio or not
+        void read_file(const string& file_path, int data_type, bool is_log);
 
         // reads a peak file of ENCODE broadpeak format
         //
@@ -72,7 +73,8 @@ class Reader
         //         starting point and end point for binary search
         //         number of data_type (in wiggle files matrix columns = data type + 2)
         //         peak of the chromosome region
-        void binary_search(const int chrom, const int chrom_begin, const int chromend, const int starting_point, const int end_point, const int data_type, const float peak);
+        //         boolean if peak should be treated as log ratio
+        void binary_search(const int chrom, const int chrom_begin, const int chromend, const int starting_point, const int end_point, const int data_type, const float peak, bool is_log);
 
 
 

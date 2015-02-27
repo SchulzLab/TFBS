@@ -22,7 +22,7 @@ int main(int argc, char* argv[]) {
     controller.parse_arguments(argc, argv);
     controller.print_prev_read_data(cout);
 
-    controller.build_svm_model();
+    // controller.build_svm_model();
 
     return 0;
 }
@@ -48,8 +48,8 @@ Controller::Controller() :
 
 Controller::~Controller() {
 
-    svm_free_model_content(svm_);
-    svm_free_and_destroy_model(&svm_);
+    // svm_free_model_content(svm_);
+    // svm_free_and_destroy_model(&svm_);
 }
 
 
@@ -62,7 +62,10 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     int c;
 
     // argument booleans
-    bool file_flag = false;
+    // file with log ratio values
+    bool file_flag_wlog = false;
+    // file with not-log ratio values
+    bool file_flag_wolog = false;
     bool directory_flag = false;
     bool peak_flag = false;
 
@@ -70,7 +73,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     for (int i = 0; i < argc; ++i) {
 
         // note: strcmp returns 0 if strings are equal
-        !strcmp(argv[i], "-f") ? ++number_of_data_types_ : 0;
+        !strcmp(argv[i], "-f") || !strcmp(argv[i], "-l") ? ++number_of_data_types_ : 0;
 
         if (!strcmp(argv[i], "-p")) {
 
@@ -94,7 +97,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
     bool model_output_flag = false;
     // scan files and directory arguments
-    while ((c = getopt(argc, argv, "p:f:d:o:")) != - 1) {
+    while ((c = getopt(argc, argv, "p:l:f:d:o:")) != - 1) {
 
         switch (c) {
 
@@ -114,9 +117,14 @@ void Controller::parse_arguments(int argc, char* argv[]) {
                 reader_class_.read_peak_file(optarg);
                 break;
 
+            case 'l':
+
+                file_flag_wlog = true;
+                break;
+
             case 'f':
 
-                file_flag = true;
+                file_flag_wolog = true;
                 break;
 
             case 'd':
@@ -126,7 +134,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
             case '?':
 
-                if (optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'o') {
+                if (optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'o' || optopt == 'l') {
 
                     fprintf(stderr, "Missing argument for -%c option.\n", optopt);
                 } else {
@@ -141,10 +149,17 @@ void Controller::parse_arguments(int argc, char* argv[]) {
                 exit(EXIT_FAILURE);
         }
 
-        if (file_flag) {
+        if (file_flag_wlog) {
 
-            file_flag = false;
+            file_flag_wlog = false;
             files_.push_back(optarg);
+            log_ratio_.push_back(true);
+
+        } else if (file_flag_wolog) {
+
+            file_flag_wolog = false;
+            files_.push_back(optarg);
+            log_ratio_.push_back(false);
 
         } else if (directory_flag) {
 
@@ -179,14 +194,15 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     }
 
 
-    vector<string> files_buffer{begin(files_), end(files_)};
+    vector<bool> log_buffer(begin(log_ratio_), end(log_ratio_));
+    vector<string> files_buffer(begin(files_), end(files_));
     // read files
 // #ifdef _OPENMP
 // #pragma omp parallel for
 // #endif
     for (int counter = 0; counter < number_of_data_types_; ++counter) {
 
-        reader_class_.read_file(files_buffer[counter], counter);
+        reader_class_.read_file(files_buffer[counter], counter, log_buffer[counter]);
     }
 }
 

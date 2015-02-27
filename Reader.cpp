@@ -1,7 +1,7 @@
 // standard lib
 #include <iostream>
 #include <fstream>
-#include <math.h>  // abs()
+#include <math.h>  // abs() exp()
 
 // external lib
 // #include "boost/filesystem.hpp"
@@ -98,7 +98,7 @@ Reader& Reader::operator=(Reader&& other_reader){
 
 
 
-void Reader::read_file(const string& file_path, int data_type) {
+void Reader::read_file(const string& file_path, int data_type, bool is_log) {
 
     FILE* actual_file = fopen (file_path.c_str(), "r");
 
@@ -112,19 +112,15 @@ void Reader::read_file(const string& file_path, int data_type) {
 
     matrix_.append_new_column(new_feature);
 
-    int lines = 0;
-
     // read one line in the file per loop
     while (fscanf(actual_file, "%s %d %d %f", chrom, &chrom_begin, &chrom_end, &peak) == 4) {
 
-        lines++;
-        cerr << lines << endl;
         if (map_str_to_chr_.find(chrom) != map_str_to_chr_.end()) {
 
             chromosome = map_str_to_chr_[chrom];
 
             // store just read data in matrix
-            binary_search(chromosome, chrom_begin, chrom_end, 0, line_counter_ - 1, data_type, peak);
+            binary_search(chromosome, chrom_begin, chrom_end, 0, line_counter_ - 1, data_type, peak, is_log);
 
         }
     }
@@ -175,7 +171,6 @@ void Reader::read_peak_file(const string& file_path) {
 
 
         ++line_counter_;
-        cerr << line_counter_ << "\n\n";
         if (map_str_to_chr_.find(chrom) != map_str_to_chr_.end()) {
 
             chromosome = map_str_to_chr_[chrom];
@@ -256,7 +251,7 @@ Matrix<float>& Reader::get_prev_read_data() {
 
 
 
-void Reader::binary_search(const int chrom, const int chrom_begin, const int chrom_end, const int start_point, const int end_point, const int data_type, const float peak) {
+void Reader::binary_search(const int chrom, const int chrom_begin, const int chrom_end, const int start_point, const int end_point, const int data_type, const float peak, bool is_log) {
 
 
     // termination
@@ -289,9 +284,25 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 // queue:  |---|
                 } else {
 
-                    // peak value that overlaps with the queue
-                    float partial_peak = (float)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
-                    matrix_(central_point, data_type + 3) += partial_peak;
+                    // remaining peak value
+                    float partial_peak_buffer;
+                    float partial_peak;
+
+                    if (is_log) {
+
+                        // peak value that overlaps with the queue
+                        partial_peak = (float)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * pow(2, peak);
+                        matrix_(central_point, data_type + 3) += partial_peak;
+                        partial_peak_buffer = pow(2, peak) - partial_peak;
+
+                    } else {
+
+                        partial_peak = (float)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
+                        matrix_(central_point, data_type + 3) += partial_peak;
+                        partial_peak_buffer = peak - partial_peak;
+
+                    }
+
 
                     // increase position in each step by one
                     int i = 1;
@@ -301,14 +312,15 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
 
                         if (matrix_(central_point + i, 2) >= chrom_end) {
 
-                            partial_peak = (float)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak;
+                            partial_peak = (float)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
                             matrix_(central_point, data_type + 3) += partial_peak;
                             break;
 
                         } else {
 
-                            partial_peak = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak;
-                            matrix_(central_point, data_type + 3) += partial_peak;
+                            partial_peak = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+                            matrix_(central_point + i, data_type + 3) += partial_peak;
+                            partial_peak_buffer -= partial_peak;
                             mod_start = matrix_(central_point + i, 2);
                             ++i;
                         }
@@ -324,35 +336,57 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                     // queue:    |-|
                     if (matrix_(central_point, 2) < chrom_end) {
 
-                        // peak value that overlaps with the queue
-                        const float partial_peak = (float)(matrix_(central_point, 2) - matrix_(central_point, 1))/(chrom_end - chrom_begin) * peak;
-                        matrix_(central_point, data_type + 3) += partial_peak;
+                        // remaining peak value
+                        float partial_peak_buffer;
 
-                        // start binary seach for remaining left and right part of the sample
-                        float partial_peak_left = (float)(matrix_(central_point, 1) - chrom_begin)/(chrom_end - chrom_begin) * peak;
+                        if (is_log) {
+
+                            // peak value that overlaps with the queue
+                            const float partial_peak = (float)(matrix_(central_point, 2) - matrix_(central_point, 1))/(chrom_end - chrom_begin) * pow(2, peak);
+                            matrix_(central_point, data_type + 3) += partial_peak;
+
+                            partial_peak_buffer = (float)(matrix_(central_point, 1) - chrom_begin)/(chrom_end - chrom_begin) * pow(2, peak);
+
+                        } else {
+
+                            // peak value that overlaps with the queue
+                            const float partial_peak = (float)(matrix_(central_point, 2) - matrix_(central_point, 1))/(chrom_end - chrom_begin) * peak;
+                            matrix_(central_point, data_type + 3) += partial_peak;
+
+                            partial_peak_buffer = (float)(matrix_(central_point, 1) - chrom_begin)/(chrom_end - chrom_begin) * peak;
+                        }
 
                         int i = 1;
                         int mod_end = matrix_(central_point, 1);
 
-                        while (matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 2) > chrom_begin) {
+                        while (matrix_(central_point - i, 0) == chrom && matrix_(central_point - i, 2) > chrom_begin) {
 
-                            if (matrix_(central_point + i, 1) <= chrom_begin) {
+                            if (matrix_(central_point - i, 1) <= chrom_begin) {
 
-                                partial_peak_left = (float)(matrix_(central_point + i, 2) - chrom_begin)/(mod_end - chrom_begin) * partial_peak_left;
-                                matrix_(central_point, data_type + 3) += partial_peak_left;
+                                const float partial_peak_left = (float)(matrix_(central_point - i, 2) - chrom_begin)/(mod_end - chrom_begin) * partial_peak_buffer;
+                                matrix_(central_point - i, data_type + 3) += partial_peak_left;
                                 break;
 
                             } else {
 
-                                partial_peak_left = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(mod_end - chrom_begin) * partial_peak_left;
-                                matrix_(central_point, data_type + 3) += partial_peak_left;
-                                mod_end = matrix_(central_point + i, 1);
+                                const float partial_peak_left = (float)(matrix_(central_point - i, 2) - matrix_(central_point - i, 1))/(mod_end - chrom_begin) * partial_peak_buffer;
+                                matrix_(central_point - i, data_type + 3) += partial_peak_left;
+                                partial_peak_buffer -= partial_peak_left;
+                                mod_end = matrix_(central_point - i, 1);
                                 ++i;
                             }
                         }
 
 
-                        float partial_peak_right = (float)(chrom_end - matrix_(central_point, 2))/(chrom_end - chrom_begin) * peak;
+                        if (is_log) {
+
+                            partial_peak_buffer = (float)(chrom_end - matrix_(central_point, 2))/(chrom_end - chrom_begin) * pow(2, peak);
+
+                        } else {
+
+                            partial_peak_buffer = (float)(chrom_end - matrix_(central_point, 2))/(chrom_end - chrom_begin) * peak;
+
+                        }
 
                         i = 1;
                         int mod_start = matrix_(central_point, 2);
@@ -361,14 +395,15 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
 
                             if (matrix_(central_point + i, 2) >= chrom_end) {
 
-                                partial_peak_right = (float)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_right;
-                                matrix_(central_point, data_type + 3) += partial_peak_right;
+                                const float partial_peak_right = (float)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+                                matrix_(central_point + i, data_type + 3) += partial_peak_right;
                                 break;
 
                             } else {
 
-                                partial_peak_right = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_right;
-                                matrix_(central_point, data_type + 3) += partial_peak_right;
+                                const float partial_peak_right = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+                                matrix_(central_point + i, data_type + 3) += partial_peak_right;
+                                partial_peak_buffer -= partial_peak_right;
                                 mod_start = matrix_(central_point + i, 2);
                                 ++i;
                             }
@@ -385,26 +420,42 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                     // queue:       |--|
                     } else {
 
-                        // peak value that overlaps with the queue
-                        float partial_peak = (float)(chrom_end - matrix_(central_point, 1))/(chrom_end - chrom_begin) * peak;
-                        matrix_(central_point, data_type + 3) += partial_peak;
+                        float partial_peak_buffer;
+                        float partial_peak;
+
+                        if (is_log) {
+
+                            // peak value that overlaps with the queue
+                            partial_peak = (float)(chrom_end - matrix_(central_point, 1))/(chrom_end - chrom_begin) * pow(2, peak);
+                            matrix_(central_point, data_type + 3) += partial_peak;
+                            partial_peak_buffer = pow(2, peak) - partial_peak;
+
+                        } else {
+
+                            // peak value that overlaps with the queue
+                            partial_peak = (float)(chrom_end - matrix_(central_point, 1))/(chrom_end - chrom_begin) * peak;
+                            matrix_(central_point, data_type + 3) += partial_peak;
+                            partial_peak_buffer = peak - partial_peak;
+
+                        }
 
                         int i = 1;
                         int mod_end = matrix_(central_point, 1);
 
-                        while (matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 2) > chrom_begin) {
+                        while (matrix_(central_point - i, 0) == chrom && matrix_(central_point - i, 2) > chrom_begin) {
 
-                            if (matrix_(central_point + i, 1) <= chrom_begin) {
+                            if (matrix_(central_point - i, 1) <= chrom_begin) {
 
-                                partial_peak = (float)(matrix_(central_point + i, 2) - chrom_begin)/(mod_end - chrom_begin) * partial_peak;
-                                matrix_(central_point, data_type + 3) += partial_peak;
+                                partial_peak = (float)(matrix_(central_point - i, 2) - chrom_begin)/(mod_end - chrom_begin) * partial_peak_buffer;
+                                matrix_(central_point - i, data_type + 3) += partial_peak;
                                 break;
 
                             } else {
 
-                                partial_peak = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(mod_end - chrom_begin) * partial_peak;
-                                matrix_(central_point, data_type + 3) += partial_peak;
-                                mod_end = matrix_(central_point + i, 1);
+                                partial_peak = (float)(matrix_(central_point - i, 2) - matrix_(central_point + i, 1))/(mod_end - chrom_begin) * partial_peak_buffer;
+                                matrix_(central_point - i, data_type + 3) += partial_peak;
+                                partial_peak_buffer -= partial_peak;
+                                mod_end = matrix_(central_point - i, 1);
                                 ++i;
                             }
                         }
@@ -414,7 +465,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 // queue:        |---|
                 } else {
 
-                    binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak);
+                    binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak, is_log);
                 }
 
             }
@@ -426,7 +477,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
             // queue:   |---|
             if (matrix_(central_point, 2) <= chrom_begin) {
 
-                binary_search(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, peak);
+                binary_search(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, peak, is_log);
 
             // matrix_(central_point, 2) > chrom_begin
             } else {
@@ -438,15 +489,38 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 // queue:  |------|
                 if (matrix_(central_point, 2) >= chrom_end) {
 
-                    matrix_(central_point, data_type + 3) += peak;
+                    if (is_log) {
+
+                        matrix_(central_point, data_type + 3) += pow(2, peak);
+
+                    } else {
+
+                        matrix_(central_point, data_type + 3) += peak;
+
+                    }
 
                 // sample:   |---|
                 // queue:  |---|
                 } else {
 
-                    // peak value that overlaps with the queue
-                    float partial_peak = (float)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
-                    matrix_(central_point, data_type + 3) += partial_peak;
+                    float partial_peak;
+                    float partial_peak_buffer;
+
+                    if (is_log) {
+
+                        // peak value that overlaps with the queue
+                        partial_peak = (float)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * pow(2, peak);
+                        partial_peak_buffer = pow(2, peak) - partial_peak;
+                        matrix_(central_point, data_type + 3) += partial_peak;
+
+                    } else {
+
+                        // peak value that overlaps with the queue
+                        partial_peak = (float)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
+                        partial_peak_buffer = peak - partial_peak;
+                        matrix_(central_point, data_type + 3) += partial_peak;
+
+                    }
 
                     int i = 1;
                     int mod_start = matrix_(central_point, 2);
@@ -455,19 +529,19 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
 
                         if (matrix_(central_point + i, 2) >= chrom_end) {
 
-                            partial_peak = (float)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak;
-                            matrix_(central_point, data_type + 3) += partial_peak;
+                            partial_peak = (float)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+                            matrix_(central_point + i, data_type + 3) += partial_peak;
                             break;
 
                         } else {
 
-                            partial_peak = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak;
-                            matrix_(central_point, data_type + 3) += partial_peak;
+                            partial_peak = (float)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+                            matrix_(central_point + i, data_type + 3) += partial_peak;
+                            partial_peak_buffer -= partial_peak;
                             mod_start = matrix_(central_point + i, 2);
                             ++i;
                         }
                     }
-
                 }
             }
         }
@@ -478,13 +552,13 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
         // queue:   |---|
         if (matrix_(central_point, 0) < chrom) {
 
-            binary_search(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, peak);
+            binary_search(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, peak, is_log);
 
         // sample:  |---|
         // queue:         |---|
         } else {
 
-            binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak);
+            binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak, is_log);
         }
     }
 }
