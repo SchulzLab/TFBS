@@ -278,7 +278,14 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 // queue:   |---|
                 if (matrix_(central_point, 2) >= chrom_end) {
 
-                    matrix_(central_point, data_type + 3) += peak;
+                    if (is_log) {
+
+                        matrix_(central_point, data_type + 3) += pow(2, peak);
+
+                    } else {
+
+                        matrix_(central_point, data_type + 3) += peak;
+                    }
 
                 // sample: |----|
                 // queue:  |---|
@@ -452,7 +459,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
 
                             } else {
 
-                                partial_peak = (float)(matrix_(central_point - i, 2) - matrix_(central_point + i, 1))/(mod_end - chrom_begin) * partial_peak_buffer;
+                                partial_peak = (float)(matrix_(central_point - i, 2) - matrix_(central_point - i, 1))/(mod_end - chrom_begin) * partial_peak_buffer;
                                 matrix_(central_point - i, data_type + 3) += partial_peak;
                                 partial_peak_buffer -= partial_peak;
                                 mod_end = matrix_(central_point - i, 1);
