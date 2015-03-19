@@ -3,9 +3,9 @@
 #include <unistd.h>    // getopt
 #include <stdlib.h>    // exit
 
-// #ifdef _OPENMP
-// #include <omp.h>
-// #endif
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "Controller.h"
 #include "libsvm_interface.h"
@@ -75,11 +75,11 @@ void Controller::parse_arguments(int argc, char* argv[]) {
         // note: strcmp returns 0 if strings are equal
         !strcmp(argv[i], "-f") || !strcmp(argv[i], "-l") ? ++number_of_data_types_ : 0;
 
-        if (!strcmp(argv[i], "-p")) {
+        if (!strcmp(argv[i], "-b") || (!strcmp(argv[i], "-p"))) {
 
             if (peak_flag) {
 
-                fprintf(stderr, "Only one peak file (-p) allowed.");
+                fprintf(stderr, "Only one peak file (-p or -b) allowed.");
             } else {
 
                 peak_flag = true;
@@ -91,13 +91,13 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
     if (!peak_flag) {
 
-        fprintf(stderr, "No peak file (-p) given.");
+        fprintf(stderr, "No peak file (-p or -b) given.");
         exit(EXIT_FAILURE);
     }
 
     bool model_output_flag = false;
     // scan files and directory arguments
-    while ((c = getopt(argc, argv, "p:l:f:d:o:")) != - 1) {
+    while ((c = getopt(argc, argv, "p:b:l:f:d:o:")) != - 1) {
 
         switch (c) {
 
@@ -114,7 +114,12 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
             case 'p':
 
-                reader_class_.read_peak_file(optarg);
+                reader_class_.read_broadpeak_file(optarg);
+                break;
+
+            case 'b':
+
+                reader_class_.read_simplebed_file(optarg);
                 break;
 
             case 'l':
@@ -134,7 +139,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
             case '?':
 
-                if (optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'o' || optopt == 'l') {
+                if (optopt == 'b' || optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'o' || optopt == 'l') {
 
                     fprintf(stderr, "Missing argument for -%c option.\n", optopt);
                 } else {
@@ -196,10 +201,13 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
     vector<bool> log_buffer(begin(log_ratio_), end(log_ratio_));
     vector<string> files_buffer(begin(files_), end(files_));
+
     // read files
-// #ifdef _OPENMP
-// #pragma omp parallel for
-// #endif
+    // init matrix
+    reader_class_.init_matrix(number_of_data_types_);
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static,1) num_threads(16)
+#endif
     for (int counter = 0; counter < number_of_data_types_; ++counter) {
 
         reader_class_.read_file(files_buffer[counter], counter, log_buffer[counter]);

@@ -48,7 +48,17 @@ class Reader
         // reads a peak file of ENCODE broadpeak format
         //
         // @param: path to a peak file
-        void read_peak_file(const string& peak_file_path);
+        void read_broadpeak_file(const string& peak_file_path);
+
+        // reads a peak file of BED format, with only the first three required fields (chromosome, start, end)
+        //
+        // @param: path to a peak file
+        void read_simplebed_file(const string& peak_file_path);
+
+        // initialize matrix to avoid unordered modification of wrong columns in parallel region
+        //
+        // @param: number of files (i.e. number of columns to append to matrix)
+        void init_matrix(int num);
 
         // get matrix - i.e. get previously read data
         Matrix<float>& get_prev_read_data();
