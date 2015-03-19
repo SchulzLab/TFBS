@@ -1,0 +1,67 @@
+NAME
+
+    reader - reading and merging sequence peak data
+
+SYNOPSIS
+
+    reader [options...] [names...]
+
+DESCRIPTION
+
+    Reader computes, given a file of chromosomal regions in (simple)BED or ENCODE
+    broadpeak format, for all given peak files in wig format (plain or log values)
+    the peak value for each entry in the chromsomal region file.
+
+    It then outputs the result as a matrix on stdout.
+
+OTIONS
+
+    -p FILE
+        Read FILE as ENCODE broadpeak file for chromosomal regions.
+
+    -b FILE
+        Read FILE as BED file. Each line should only provide the obligatory three
+        entries "chromosome", "region_start" and "region_end".
+
+    -f FILE
+        Read FILE as .wig file with number of reads (no log values) as entries.
+
+    -l FILE
+        Read FILE as .wig file with log peak values.
+
+NAMES
+
+    Optionally it is possible to provide names for the column description of the
+    resulting matrix. Providing up to the number -l and -f files many names, the
+    given names will be matched in the same order as the files are provided.
+    
+    For all files, for which no names are provided, the corresponding matrix column
+    will be named like the given file path.
+    
+    See section EXAMPLES for examples.
+
+RESULT
+
+    The result of the program in shape of a matrix will be printed on stdout.
+    The first line of the output contains a description for each column.
+    Those descriptions are a sequence of non-whitespace characters seperated by 
+    whitespace.
+
+EXAMPLES
+
+    We want to compute the peak values for two files for some regions provided
+    by a BED file. Since the file names are complex and not nice to read, we also
+    want to rename the columns in the resulting matrix.
+
+    reader -b /path/to/bed_file -l /path/to/file_one -l /path/to/file_two nice_name1 nice_name2
+
+    Here the column containing the peaks of file_one will be named nice_name1 and
+    the one for file_two nice_name2.
+
+
+    Now we want to compute the peak for one .wig-file for regions provided by an
+    ENCODE broadpeak file. Now we don't need any nice descriptions for the matrix
+    columns, the filepath as a name for the corresponding column will be sufficient.
+    The peak entries in the .wig-file are no log values.
+
+    reader -p /path/to/broadpeak_file -f /path/to/wig_file
