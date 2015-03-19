@@ -2,7 +2,7 @@ OBJECTS=Matrix.o Reader.o Controller.o svm.o libsvm_interface.o
 
 PROGNAME=Reader
 
-CXXFLAGS= -std=c++0x -ggdb -Wall -pedantic -pipe
+CXXFLAGS= -std=c++0x -ggdb -Wall -pedantic -pipe -fopenmp
 
 .PHONY: all clean
 
