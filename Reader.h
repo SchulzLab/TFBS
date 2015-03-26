@@ -20,8 +20,8 @@ class Reader
         Reader();
 
         // @param: number of different data types (e.g. Histone modification measurements
-        // and DNAse I data would mean 2 different data types)
-        //      i.e. number of additional columns in the matrix
+        //         and DNAse I data would mean 2 different data types)
+        //          i.e. number of additional columns in the matrix
         explicit Reader(int number_of_data_types);
 
         // move constructor
@@ -67,10 +67,13 @@ class Reader
         // get data in libSVM format
         //
         // @param: (will later hold the result)
-        //          number_of_data_points -> _number of data points hence size of the following vector
-        //          data_points -> vector of data points, each holding all features. see libSVM for more info
+        //          number_of_data_points - _number of data points hence size of the following vector
+        //          data_points - vector of data points, each holding all features. see libSVM for more info
         void get_as_libSVM_data(int* number_of_data_points, struct svm_node** data_points);
 
+
+        // normalize feature values for each region to one bin
+        void normalize_regions();
 
     private:
 

@@ -334,6 +334,23 @@ Matrix<float>& Reader::get_prev_read_data() {
 
 
 
+void Reader::normalize_regions() {
+
+    for (int sample_ind = 0; sample_ind < matrix_.get_number_of_lines(); ++sample_ind) {
+
+        int region_size = matrix_(sample_ind, 2) - matrix_(sample_ind, 1);
+
+        for (int feature_ind = 3; feature_ind < matrix_.get_number_of_columns(); ++feature_ind) {
+
+            matrix_(sample_ind, feature_ind) /= region_size;
+        }
+    }
+}
+
+
+
+
+
 void Reader::binary_search(const int chrom, const int chrom_begin, const int chrom_end, const int start_point, const int end_point, const int data_type, const float peak, bool is_log) {
 
 
