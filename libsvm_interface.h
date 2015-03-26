@@ -44,4 +44,24 @@ struct svm_parameter* train_params(const struct svm_problem* prob);
 int labelset_distance(const struct svm_problem* prob, const double* predicted);
 
 
+// split given libsvm problem into 2 different sets (10% will be drawn randomly for the evaluation set
+// and the rest will be assigned to the training set)
+//
+// @param:  prob - the libsvm problem (data set) that should be splitted
+//          training_set - empty svm_problem that will hold the training set
+//          eval_set - empty svm_problem that will hold the evaluation set
+//
+void split_training_set(const struct svm_problem* prob, struct svm_problem* training_set, struct svm_problem* eval_set);
+
+
+// evaluate a trained model on a given sample set
+//
+// @param:  eval_prob - the sample set on which the model should be evaluated on
+//          model - the trained model that should be tested
+//
+// @return: the number of falsely classified samples
+//
+int evaluate_model(const struct svm_problem* eval_prob, const svm_model* model);
+
+
 #endif /* LIBSVM_INTERFACE_H */

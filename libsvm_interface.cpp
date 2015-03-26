@@ -1,4 +1,7 @@
 #include <stdlib.h>
+#include <random>
+#include <functional> // bind
+#include <list>
 
 #include "libsvm_interface.h"
 
@@ -6,6 +9,7 @@
 
 
 struct svm_problem* construct_svm_problem(Matrix<float>& positive_data, Matrix<float>& negative_data) {
+
 
     struct svm_problem* svm_prob = (svm_problem*)malloc(sizeof(*svm_prob));
 
@@ -84,16 +88,6 @@ struct svm_problem* construct_svm_problem(Matrix<float>& positive_data, Matrix<f
 
 
     svm_prob->x = &training_set[0];
-    for (int sample = 0; sample < svm_prob->l; ++sample) {
-
-        int i = 0;
-        while (svm_prob->x[sample][i].index != -1) {
-
-            cerr << "(" << svm_prob->x[sample][i].index << "/" << svm_prob->x[sample][i].value << ")\n\n";
-            ++i;
-        }
-
-    }
     return svm_prob;
 }
 
@@ -138,12 +132,9 @@ constexpr int k_fold = 10;
 struct svm_parameter* train_params(const struct svm_problem* prob) {
 
     // get initial parameter set
-    // OMP: private
     struct svm_parameter* params;
-    // OMP: shared
     struct svm_parameter* best_params = construct_svm_param(0, 0);
 
-    // OMP: private
     // this variable will contain the predicted labels for prob
     double* predicted;
 
@@ -152,8 +143,11 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
 
 
     // train params in parallel
-    // outer loop: slack variable c 0% (hard margin) to 5% of training data
-    for (int c = 1; c <= prob->l /*/ 20*/; c++) {
+    // outer loop: slack variable c 0,5% to 5% of training data in steps of 0.5%
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static,1) private(params, predicted) num_threads(16)
+#endif
+    for (int c = prob->l / 200; c <= prob->l / 20; c += prob->l/200) {
 
         // inner loop: rbf kernel parameter from 1 to 10^(-6)
         for (double gamma = 1; gamma >= 0.000001; gamma /= 10) {
@@ -169,9 +163,9 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
             // omp private
             int new_best;
             // if this is the best found set of parameters update the current best
-// #ifdef _OPNEMP
-// #pragma omp atomic
-// #endif
+#ifdef _OPENMP
+#pragma omp critical
+#endif
             if ((new_best = labelset_distance(prob, predicted)) < best_result) {
 
                 best_result = new_best;
@@ -191,20 +185,123 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
 
 
 
+void split_training_set(const struct svm_problem* prob, struct svm_problem* training_set, struct svm_problem* eval_set) {
+
+    // init random seed for mersenne twister and make drawn values uniformally distributed in problem size range
+    mt19937::result_type seed = 100;
+    auto dice_rand = std::bind(std::uniform_int_distribution<int>(0, prob->l - 1), mt19937(seed));
+
+    // split the size to get 10% of the set as evaluation set
+    eval_set->l = prob->l/10;
+    training_set->l = prob->l - eval_set->l;
+    // init sample flag memory
+    eval_set->y = (double*)(malloc(eval_set->l * sizeof(*eval_set->y)));
+    training_set->y = (double*)(malloc(training_set->l * sizeof(*training_set->y)));
+    // init sample features memory
+    eval_set->x = (struct svm_node **)(malloc(eval_set->l * sizeof(*eval_set->x)));
+    training_set->x = (struct svm_node **)(malloc(training_set->l * sizeof(*training_set->x)));
+
+    // save which samples has been drawn so far
+    list<int> used_samples;
+
+    // draw the evaluation set
+    for (int i = 0; i < eval_set->l; ++i) {
+
+        // draw a sample and test if it has been drawn before
+        int new_sample;
+        bool drawn_before;
+        do {
+
+            drawn_before = false;
+            new_sample = dice_rand();
+            for (int used_sample : used_samples) {
+
+                if (new_sample == used_sample) {
+
+                    drawn_before = true;
+                    break;
+                }
+            }
+
+        } while(drawn_before);
+
+        used_samples.push_back(new_sample);
+        eval_set->y[i] = prob->y[new_sample];
+        eval_set->x[i] = prob->x[new_sample];
+    }
+
+    // assign the training set
+
+    // index for initial set which we try to split
+    int prob_index = 0;
+    for (int i = 0; i < training_set->l; ++i) {
+
+        bool used_in_eval;
+        do {
+
+            used_in_eval = false;
+            for (int used_sample : used_samples) {
+
+                if (prob_index == used_sample) {
+
+                    used_in_eval = true;
+                    ++prob_index;
+                    break;
+                }
+            }
+
+        } while(used_in_eval);
+
+        training_set->y[i] = prob->y[prob_index];
+        training_set->x[i] = prob->x[prob_index];
+        ++prob_index;
+    }
+    // if (prob_index < prob->l - 1) {
+    //
+    //     fprintf(stderr, "Error: Unsuccessfull splitting of the training set\n\
+    //             eval_samples: %d\n\
+    //             prob->l: %d\n\
+    //             prob index: %d\n", used_samples.size(), prob->l, prob_index);
+    // }
+}
+
+
+
+
+
 int labelset_distance(const struct svm_problem* prob, const double* predicted) {
 
     int distance = 0;
 
-    // for (int fold = 0; fold  < k_fold; ++fold) {
+    for (int index = 0; index < prob->l; ++index) {
 
-        for (int index = 0; index < prob->l; ++index) {
+        // libSVM seems to fill predicted with probabilitys for c_svm - change comparison?
+        if (prob->y[index] != predicted[index]) {
 
-            // libSVM seems to fill predicted with probabilitys for c_svm - change comparison?
-            if (prob->y[index] == predicted[/*fold * prob->l +*/ index]) {
-
-                ++distance;
-            }
+            ++distance;
         }
-    // }
+    }
+
     return distance;
+}
+
+
+
+
+
+int evaluate_model(const struct svm_problem* eval_prob, const svm_model* model) {
+
+
+    // number of falsely classified samples
+    int f_flags = 0;
+
+    for (int i = 0; i < eval_prob->l; ++i) {
+
+        if (svm_predict(model, eval_prob->x[i]) != eval_prob->y[i]) {
+
+            ++f_flags;
+        }
+    }
+
+    return f_flags;
 }
