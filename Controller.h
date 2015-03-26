@@ -50,8 +50,9 @@ class Controller {
         // corresponding names for the data type (e.g. "DNAse" "Histone_mod")
         vector<string> data_type_names_;
 
-        // reads all files
-        Reader reader_class_;
+        // Reader for the positive and negative training data set
+        Reader reader_class_positive_set_;
+        Reader reader_class_negative_set_;
 
         // trained svm model
         struct svm_model* svm_;

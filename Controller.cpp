@@ -20,9 +20,10 @@ int main(int argc, char* argv[]) {
     Controller controller;
 
     controller.parse_arguments(argc, argv);
-    controller.print_prev_read_data(cout);
+    // controller.print_prev_read_data(cout);
 
-    // controller.build_svm_model();
+    controller.build_svm_model();
+    controller.print_svm_model();
 
     return 0;
 }
@@ -37,7 +38,8 @@ Controller::Controller() :
         number_of_data_types_(0)
     ,   files_()
     ,   data_type_names_()
-    ,   reader_class_()
+    ,   reader_class_positive_set_()
+    ,   reader_class_negative_set_()
     ,   model_output_file_("")
 {
 }
@@ -66,8 +68,16 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     bool file_flag_wlog = false;
     // file with not-log ratio values
     bool file_flag_wolog = false;
+
+
     bool directory_flag = false;
+    // region file flag
     bool peak_flag = false;
+    // negative training data region file flag
+    bool negative_data_flag = false;
+
+    bool model_output_flag = false;
+
 
     // count the number of files or directorys
     for (int i = 0; i < argc; ++i) {
@@ -75,6 +85,15 @@ void Controller::parse_arguments(int argc, char* argv[]) {
         // note: strcmp returns 0 if strings are equal
         !strcmp(argv[i], "-f") || !strcmp(argv[i], "-l") ? ++number_of_data_types_ : 0;
 
+        if (!strcmp(argv[i], "-n")) {
+
+            if (negative_data_flag) {
+
+                fprintf(stderr, "Error: Multiple negative region files given (-n)\n");
+                exit(EXIT_FAILURE);
+            }
+            negative_data_flag = true;
+        }
         if (!strcmp(argv[i], "-b") || (!strcmp(argv[i], "-p"))) {
 
             if (peak_flag) {
@@ -87,7 +106,8 @@ void Controller::parse_arguments(int argc, char* argv[]) {
         }
     }
 
-    reader_class_ = Reader(number_of_data_types_);
+    reader_class_positive_set_ = Reader(number_of_data_types_);
+    reader_class_negative_set_ = Reader(number_of_data_types_);
 
     if (!peak_flag) {
 
@@ -95,12 +115,21 @@ void Controller::parse_arguments(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    bool model_output_flag = false;
     // scan files and directory arguments
-    while ((c = getopt(argc, argv, "p:b:l:f:d:o:")) != - 1) {
+    while ((c = getopt(argc, argv, "n:p:b:l:f:d:o:")) != - 1) {
 
         switch (c) {
 
+
+
+            // SVM arguments
+            //      negative training data
+            case 'n':
+
+                reader_class_negative_set_.read_simplebed_file(optarg);
+                break;
+
+            //      output filepath to save trained model
             case 'o':
 
                 if (model_output_flag) {
@@ -112,14 +141,17 @@ void Controller::parse_arguments(int argc, char* argv[]) {
                 model_output_flag = true;
                 break;
 
+
+
+            // reader arguments
             case 'p':
 
-                reader_class_.read_broadpeak_file(optarg);
+                reader_class_positive_set_.read_broadpeak_file(optarg);
                 break;
 
             case 'b':
 
-                reader_class_.read_simplebed_file(optarg);
+                reader_class_positive_set_.read_simplebed_file(optarg);
                 break;
 
             case 'l':
@@ -139,7 +171,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
             case '?':
 
-                if (optopt == 'b' || optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'o' || optopt == 'l') {
+                if (optopt == 'n' || optopt == 'b' || optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'o' || optopt == 'l') {
 
                     fprintf(stderr, "Missing argument for -%c option.\n", optopt);
                 } else {
@@ -204,13 +236,26 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
     // read files
     // init matrix
-    reader_class_.init_matrix(number_of_data_types_);
+    reader_class_positive_set_.init_matrix(number_of_data_types_);
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static,1) num_threads(16)
 #endif
     for (int counter = 0; counter < number_of_data_types_; ++counter) {
 
-        reader_class_.read_file(files_buffer[counter], counter, log_buffer[counter]);
+        reader_class_positive_set_.read_file(files_buffer[counter], counter, log_buffer[counter]);
+    }
+
+    // read files again to build negative training samples
+    if (negative_data_flag) {
+
+        reader_class_negative_set_.init_matrix(number_of_data_types_);
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static,1) num_threads(16)
+#endif
+        for (int counter = 0; counter < number_of_data_types_; ++counter) {
+
+            reader_class_negative_set_.read_file(files_buffer[counter], counter, log_buffer[counter]);
+        }
     }
 }
 
@@ -229,7 +274,7 @@ void Controller::print_prev_read_data(ostream& os) {
         os << data_type_names_[i] << "\t";
     }
     os << endl << endl;
-    reader_class_.print_prev_read_data(os);
+    reader_class_positive_set_.print_prev_read_data(os);
 }
 
 
@@ -237,21 +282,26 @@ void Controller::print_prev_read_data(ostream& os) {
 
 void Controller::build_svm_model() {
 
-    Matrix<float> m = Matrix<float>();
-    struct svm_problem* prob = construct_svm_problem(reader_class_.get_prev_read_data(), m);
+    struct svm_problem* prob = construct_svm_problem(reader_class_positive_set_.get_prev_read_data(), reader_class_negative_set_.get_prev_read_data());
+    fprintf(stdout, "Successfully constructed a SVM problem out of the given data.\n");
 
-    struct svm_parameter* params = train_params(prob);
+    struct svm_problem* train_prob = (struct svm_problem*)(malloc(sizeof(*train_prob)));
+    struct svm_problem* eval_prob = (struct svm_problem*)(malloc(sizeof(*eval_prob)));
+    split_training_set(prob, train_prob, eval_prob);
+    fprintf(stdout, "Splitted data into evaluation and training set.\n");
 
-    // check parameters doesn't make sense since you must init all values of params which is cluelsess
-    // const char* errormessage = svm_check_parameter(prob, params);
-    //
-    // if (errormessage != NULL) {
-    //
-    //     fprintf(stderr, errormessage);
-    // }
+    struct svm_parameter* params = train_params(train_prob);
+    fprintf(stdout, "Trained SVM parameters.\n");
+
 
     // train actual model
-    svm_ = svm_train(prob, params);
+    svm_ = svm_train(train_prob, params);
+    fprintf(stdout, "Trained final model.\n");
+
+    fprintf(stdout, "\n\nAccuracy of the model:\n\
+            Number of samples in the evaluation set: %d\n\
+            Number of falsely classified samples: %d\n"
+            , eval_prob->l, evaluate_model(eval_prob, svm_));
 }
 
 
