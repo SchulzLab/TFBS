@@ -27,7 +27,10 @@ class Controller {
         void parse_arguments(int argc, char* argv[]);
 
         // print out the data that has been read
-        void print_prev_read_data(ostream& os);
+        //
+        // positive set: positive_samples.matrix
+        // negative set: negative_samples.matrix
+        void print_prev_read_data();
 
 
         // build a svm model

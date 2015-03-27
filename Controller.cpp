@@ -2,6 +2,7 @@
 #include <string.h>    // strcmp
 #include <unistd.h>    // getopt
 #include <stdlib.h>    // exit
+#include <fstream>     // ofstream
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -20,10 +21,10 @@ int main(int argc, char* argv[]) {
     Controller controller;
 
     controller.parse_arguments(argc, argv);
-    // controller.print_prev_read_data(cout);
+    controller.print_prev_read_data();
 
-    controller.build_svm_model();
-    controller.print_svm_model();
+    // controller.build_svm_model();
+    // controller.print_svm_model();
 
     return 0;
 }
@@ -78,12 +79,39 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
     bool model_output_flag = false;
 
+    // matrix file flags
+    bool positive_matrix_flag = false;
+    bool negative_matrix_flag = false;
 
     // count the number of files or directorys
+    // set flags and exit program if there are multiple files for the same operation
     for (int i = 0; i < argc; ++i) {
 
         // note: strcmp returns 0 if strings are equal
-        !strcmp(argv[i], "-f") || !strcmp(argv[i], "-l") ? ++number_of_data_types_ : 0;
+        if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "-l")){
+
+            ++number_of_data_types_;
+        }
+
+        if (!strcmp(argv[i], "-m")) {
+
+            if (positive_matrix_flag || peak_flag) {
+
+                fprintf(stderr, "Error: Multiple positive sets (-m -m  OR  -m -p  OR -m -b)\n");
+                exit(EXIT_FAILURE);
+            }
+            positive_matrix_flag = true;
+        }
+
+        if (!strcmp(argv[i], "-t")) {
+
+            if (negative_matrix_flag || negative_data_flag) {
+
+                fprintf(stderr, "Error: Multiple negative sets (-t -t  OR  -t -n)\n");
+                exit(EXIT_FAILURE);
+            }
+            negative_matrix_flag = true;
+        }
 
         if (!strcmp(argv[i], "-n")) {
 
@@ -116,7 +144,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     }
 
     // scan files and directory arguments
-    while ((c = getopt(argc, argv, "n:p:b:l:f:d:o:")) != - 1) {
+    while ((c = getopt(argc, argv, "m:t:n:p:b:l:f:d:o:")) != - 1) {
 
         switch (c) {
 
@@ -144,6 +172,16 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
 
             // reader arguments
+            case 'm':
+
+                reader_class_positive_set_.read_matrix_file(optarg);
+                break;
+
+            case 't':
+
+                reader_class_negative_set_.read_matrix_file(optarg);
+                break;
+
             case 'p':
 
                 reader_class_positive_set_.read_broadpeak_file(optarg);
@@ -171,7 +209,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
             case '?':
 
-                if (optopt == 'n' || optopt == 'b' || optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'o' || optopt == 'l') {
+                if (optopt == 'm' || optopt == 't' || optopt == 'n' || optopt == 'b' || optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'o' || optopt == 'l') {
 
                     fprintf(stderr, "Missing argument for -%c option.\n", optopt);
                 } else {
@@ -263,8 +301,10 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
 
 
-void Controller::print_prev_read_data(ostream& os) {
+void Controller::print_prev_read_data() {
 
+    ofstream os;
+    os.open("positive_samples.matrix");
     os << "Data that has been read:\n";
     // wiggle file specific
     os << "gen\t" << "gen_start\t" << "gen_end\t";
@@ -275,6 +315,20 @@ void Controller::print_prev_read_data(ostream& os) {
     }
     os << endl << endl;
     reader_class_positive_set_.print_prev_read_data(os);
+    os.close();
+
+    os.open("negative_samples.matrix");
+    os << "Data that has been read:\n";
+    // wiggle file specific
+    os << "gen\t" << "gen_start\t" << "gen_end\t";
+
+    for (int i = 0; i < number_of_data_types_; ++i) {
+
+        os << data_type_names_[i] << "\t";
+    }
+    os << endl << endl;
+    reader_class_negative_set_.print_prev_read_data(os);
+    os.close();
 }
 
 
