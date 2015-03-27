@@ -55,6 +55,11 @@ class Reader
         // @param: path to a peak file
         void read_simplebed_file(const string& peak_file_path);
 
+        // reads a matrix out of a given file
+        //
+        // @param: a file to read from
+        void read_matrix_file(const string& matrix_file_path);
+
         // initialize matrix to avoid unordered modification of wrong columns in parallel region
         //
         // @param: number of files (i.e. number of columns to append to matrix)
@@ -75,6 +80,7 @@ class Reader
         // normalize feature values for each region to one bin
         void normalize_regions();
 
+
     private:
 
 
@@ -88,6 +94,10 @@ class Reader
         //         peak of the chromosome region
         //         boolean if peak should be treated as log ratio
         void binary_search(const int chrom, const int chrom_begin, const int chromend, const int starting_point, const int end_point, const int data_type, const float peak, bool is_log);
+
+        // initialize the mapping of external names for chromosomes used in files to internal
+        // this is required to avoid problems matching different notations for the same chromosome in files of a single run
+        void init_chr_mapping();
 
 
 

@@ -1,5 +1,6 @@
 // standard lib
 #include <iostream>
+#include <sstream>
 #include <fstream>
 #include <math.h>  // abs() exp()
 
@@ -21,7 +22,9 @@ Reader::Reader() :
         matrix_()
     ,   number_of_data_types_(0)
     ,   line_counter_(0)
+    ,   chrom_numerical_(0)
 {
+    init_chr_mapping();
 }
 
 
@@ -34,6 +37,7 @@ Reader::Reader(int number_of_data_types) :
     ,   line_counter_(0)
     ,   chrom_numerical_(0)
 {
+    init_chr_mapping();
 }
 
 
@@ -286,6 +290,31 @@ void Reader::read_simplebed_file(const string& file_path) {
     }
 
     fclose(peak_file);
+}
+
+
+
+
+
+void Reader::read_matrix_file(const string& matrix_file_path) {
+
+    fstream fs (matrix_file_path, fstream::in);
+
+    // extract first line of the file
+    string first_line;
+    getline(fs, first_line);
+    istringstream extractor_first_line(first_line);
+
+    string column_desc;
+    int number_of_columns = 0;
+    while (extractor_first_line >> column_desc) {
+
+        ++number_of_columns;
+    }
+
+    // TODO: init matrix_ and read
+
+    fs.close();
 }
 
 
@@ -683,4 +712,107 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
             binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak, is_log);
         }
     }
+}
+
+
+
+
+
+void Reader::init_chr_mapping() {
+
+    map_str_to_chr_["chr1"] = chrom_numerical_;
+    map_str_to_chr_["1"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "1";
+
+    map_str_to_chr_["chr2"] = chrom_numerical_;
+    map_str_to_chr_["2"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "2";
+
+    map_str_to_chr_["chr3"] = chrom_numerical_;
+    map_str_to_chr_["3"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "3";
+
+    map_str_to_chr_["chr4"] = chrom_numerical_;
+    map_str_to_chr_["4"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "4";
+
+    map_str_to_chr_["chr5"] = chrom_numerical_;
+    map_str_to_chr_["5"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "5";
+
+    map_str_to_chr_["chr6"] = chrom_numerical_;
+    map_str_to_chr_["6"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "6";
+
+    map_str_to_chr_["chr7"] = chrom_numerical_;
+    map_str_to_chr_["7"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "7";
+
+    map_str_to_chr_["chr8"] = chrom_numerical_;
+    map_str_to_chr_["8"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "8";
+
+    map_str_to_chr_["chr9"] = chrom_numerical_;
+    map_str_to_chr_["9"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "9";
+
+    map_str_to_chr_["chr10"] = chrom_numerical_;
+    map_str_to_chr_["10"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "10";
+
+    map_str_to_chr_["chr11"] = chrom_numerical_;
+    map_str_to_chr_["11"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "11";
+
+    map_str_to_chr_["chr12"] = chrom_numerical_;
+    map_str_to_chr_["12"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "12";
+
+    map_str_to_chr_["chr13"] = chrom_numerical_;
+    map_str_to_chr_["13"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "13";
+
+    map_str_to_chr_["chr14"] = chrom_numerical_;
+    map_str_to_chr_["14"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "14";
+
+    map_str_to_chr_["chr15"] = chrom_numerical_;
+    map_str_to_chr_["15"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "15";
+
+    map_str_to_chr_["chr16"] = chrom_numerical_;
+    map_str_to_chr_["16"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "16";
+
+    map_str_to_chr_["chr17"] = chrom_numerical_;
+    map_str_to_chr_["17"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "17";
+
+    map_str_to_chr_["chr18"] = chrom_numerical_;
+    map_str_to_chr_["18"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "18";
+
+    map_str_to_chr_["chr19"] = chrom_numerical_;
+    map_str_to_chr_["19"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "19";
+
+    map_str_to_chr_["chr20"] = chrom_numerical_;
+    map_str_to_chr_["20"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "20";
+
+    map_str_to_chr_["chr21"] = chrom_numerical_;
+    map_str_to_chr_["21"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "21";
+
+    map_str_to_chr_["chr22"] = chrom_numerical_;
+    map_str_to_chr_["22"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "22";
+
+    map_str_to_chr_["chrX"] = chrom_numerical_;
+    map_str_to_chr_["X"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "X";
+
+    map_str_to_chr_["chrY"] = chrom_numerical_;
+    map_str_to_chr_["Y"] = chrom_numerical_;
+    map_chr_to_str_[chrom_numerical_++] = "Y";
 }
