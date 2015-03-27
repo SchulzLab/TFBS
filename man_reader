@@ -12,9 +12,15 @@ DESCRIPTION
     broadpeak format, for all given peak files in wig format (plain or log values)
     the peak value for each entry in the chromsomal region file.
 
-    It then outputs the result as a matrix on stdout.
+    It then outputs the result as a matrix.
 
 OTIONS
+
+    -m FILE
+	Read FILE as matrix for positive sample set
+
+    -t FILE
+	Read FILE as matrix for negative sample set
 
     -p FILE
         Read FILE as ENCODE broadpeak file for chromosomal regions.
@@ -42,7 +48,8 @@ NAMES
 
 RESULT
 
-    The result of the program in shape of a matrix will be printed on stdout.
+    The result of the program in shape of a matrix will be printed in 
+    "positive_samples.matrix" and "negative_samples.matrix".
     The first line of the output contains a description for each column.
     Those descriptions are a sequence of non-whitespace characters seperated by 
     whitespace.
@@ -59,9 +66,16 @@ EXAMPLES
     the one for file_two nice_name2.
 
 
+
     Now we want to compute the peak for one .wig-file for regions provided by an
     ENCODE broadpeak file. Now we don't need any nice descriptions for the matrix
     columns, the filepath as a name for the corresponding column will be sufficient.
     The peak entries in the .wig-file are no log values.
 
     reader -p /path/to/broadpeak_file -f /path/to/wig_file
+
+
+
+    Finally we want to reuse the just constructed matrix for further work.
+
+    reader -m positive_samples.matrix -t negative_samples.matrix
