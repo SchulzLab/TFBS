@@ -1,12 +1,18 @@
-OBJECTS=Matrix.o Reader.o Controller.o svm.o libsvm_interface.o
+# whole tool
+OBJECTSCOMP=Matrix.o Reader.o Controller.o svm.o libsvm_interface.o tfbs_main.o
+PROGNAMECOMP=tfbs
 
-PROGNAME=reader
+# reader tool
+OBJECTSREAD=Matrix.o Reader.o Controller_reader.o reader_main.o
+PROGNAMEREAD=reader
+
+
 
 CXXFLAGS= -std=c++0x -ggdb -Wall -pedantic -pipe -fopenmp
 
 .PHONY: all clean
 
-all: ${PROGNAME}
+all: ${PROGNAMECOMP}
 
 %.o: %.cpp %.h
 	${CXX} ${CXXFLAGS} -c $<
@@ -14,8 +20,11 @@ all: ${PROGNAME}
 %.o: %.cpp
 	${CXX} ${CXXFLAGS} -c $<
 
-${PROGNAME}: ${OBJECTS}
-	${CXX} ${CXXFLAGS} ${OBJECTS} -o $@ 
+${PROGNAMECOMP}: ${OBJECTSCOMP}
+	${CXX} ${CXXFLAGS} ${OBJECTSCOMP} -o $@ 
+
+${PROGNAMEREAD}: ${OBJECTSREAD}
+	${CXX} ${CXXFLAGS} ${OBJECTSREAD} -o $@ 
 
 clean:
-	rm -f ${OBJECTS} ${PROGNAME}
+	rm -f ${OBJECTSCOMP} ${PROGNAMECOMP} ${OBJECTSREAD} ${PROGNAMEREAD}
