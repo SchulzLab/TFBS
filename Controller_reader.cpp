@@ -9,7 +9,6 @@
 #endif
 
 #include "Controller.h"
-#include "libsvm_interface.h"
 
 using namespace std;
 
@@ -22,16 +21,6 @@ Controller::Controller() :
     ,   reader_class_negative_set_()
     ,   model_output_file_("")
 {
-}
-
-
-
-
-
-Controller::~Controller() {
-
-    svm_free_model_content(svm_);
-    svm_free_and_destroy_model(&svm_);
 }
 
 
@@ -55,8 +44,6 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     bool peak_flag = false;
     // negative training data region file flag
     bool negative_data_flag = false;
-
-    bool model_output_flag = false;
 
     // matrix file flags
     bool positive_matrix_flag = false;
@@ -123,7 +110,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     }
 
     // scan files and directory arguments
-    while ((c = getopt(argc, argv, "m:t:n:p:b:l:f:d:o:")) != - 1) {
+    while ((c = getopt(argc, argv, "m:t:n:p:b:l:f:d:")) != - 1) {
 
         switch (c) {
 
@@ -134,17 +121,6 @@ void Controller::parse_arguments(int argc, char* argv[]) {
                 reader_class_negative_set_.read_simplebed_file(optarg);
                 break;
 
-            // output filepath to save trained model
-            case 'o':
-
-                if (model_output_flag) {
-
-                    fprintf(stderr, "Error: Multiple output pathes given (-o)\n");
-                    exit(EXIT_FAILURE);
-                }
-                model_output_file_ = optarg;
-                model_output_flag = true;
-                break;
 
             case 'm':
 
@@ -183,7 +159,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
             case '?':
 
-                if (optopt == 'm' || optopt == 't' || optopt == 'n' || optopt == 'b' || optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'o' || optopt == 'l') {
+                if (optopt == 'm' || optopt == 't' || optopt == 'n' || optopt == 'b' || optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'l') {
 
                     fprintf(stderr, "Missing argument for -%c option.\n", optopt);
                 } else {
@@ -303,50 +279,4 @@ void Controller::print_prev_read_data() {
     os << endl << endl;
     reader_class_negative_set_.print_prev_read_data(os);
     os.close();
-}
-
-
-
-
-void Controller::build_svm_model() {
-
-    // normalize features on length of the region
-    reader_class_positive_set_.normalize_regions();
-    reader_class_negative_set_.normalize_regions();
-
-    // translate matrix into libsvm problem
-    struct svm_problem* prob = construct_svm_problem(reader_class_positive_set_.get_prev_read_data(), reader_class_negative_set_.get_prev_read_data());
-    fprintf(stdout, "Successfully constructed a SVM problem out of the given data.\n");
-
-    struct svm_problem* train_prob = (struct svm_problem*)(malloc(sizeof(*train_prob)));
-    struct svm_problem* eval_prob = (struct svm_problem*)(malloc(sizeof(*eval_prob)));
-    split_training_set(prob, train_prob, eval_prob);
-    fprintf(stdout, "Splitted data into evaluation and training set.\n");
-
-    struct svm_parameter* params = train_params(train_prob);
-    fprintf(stdout, "Trained SVM parameters.\n");
-
-
-    // train actual model
-    svm_ = svm_train(train_prob, params);
-    fprintf(stdout, "Trained final model.\n");
-
-    fprintf(stdout, "\n\nAccuracy of the model:\n\
-            Number of samples in the evaluation set: %d\n\
-            Number of falsely classified samples: %d\n"
-            , eval_prob->l, evaluate_model(eval_prob, svm_));
-}
-
-
-
-
-void Controller::print_svm_model() {
-
-    if (model_output_file_ != "") {
-
-        if (svm_save_model(model_output_file_.c_str(), svm_) != 0) {
-
-            fprintf(stderr, ("An error occured while saving the SVM model to " + model_output_file_ + "\n").c_str());
-        }
-    }
 }

@@ -11,16 +11,21 @@ DESCRIPTION
     Reader computes, given a file of chromosomal regions in (simple)BED or ENCODE
     broadpeak format, for all given peak files in wig format (plain or log values)
     the peak value for each entry in the chromsomal region file.
+    It is also possible to provide an additional region file (e.g. for a negative
+    training set) on which the same region files should be applied.
+    
+    NOTE: All FILEs that are used within the reader must be naturally sorted and
+          shall not contain any comment lines.
 
-    It then outputs the result as a matrix.
+    It then outputs the result as a matrix (or two if two region files are provided).
 
 OTIONS
 
     -m FILE
-	Read FILE as matrix for positive sample set
+        Read FILE as matrix for positive sample set
 
     -t FILE
-	Read FILE as matrix for negative sample set
+        Read FILE as matrix for negative sample set
 
     -p FILE
         Read FILE as ENCODE broadpeak file for chromosomal regions.

@@ -312,9 +312,80 @@ void Reader::read_matrix_file(const string& matrix_file_path) {
         ++number_of_columns;
     }
 
-    // TODO: init matrix_ and read
-
     fs.close();
+
+    // Capacity of vectors in Matrix class - reservation due to performance reasons
+    constexpr int INITIAL_V_CAP = 100000;
+    constexpr int V_CAP_STEPSIZE = 10000;
+
+    // actual capacity of one column
+    int actually_reserved = INITIAL_V_CAP;
+
+    FILE* matrix_file = fopen (matrix_file_path.c_str(), "r");
+
+    // initialize and reserve memory for information
+    for (int i = 0; i < number_of_columns; ++i) {
+
+        vector<float> chromosome_v;
+        chromosome_v.reserve(INITIAL_V_CAP);
+
+        matrix_.append_new_column(chromosome_v);
+        matrix_.append_new_column(chrom_begin_v);
+        matrix_.append_new_column(chrom_end_v);
+
+    }
+
+    // TODO read one single entry per loop and write it into matrix[entry_number/number_of_columns][entry_number%number_of_columns]
+    //
+    // read one line in the file per outer loop
+    //
+    // number of entrys totally read
+    int entry_number = 0,
+
+    // we can assume that even the name of the chromosome is a number since we require
+    // this as a format convention for our matrix and our produced output will always
+    // match chrNUMBER to NUMBER when printing the just read data
+    while (fscanf(matrix_file, "%d") == 1) {
+
+
+        // TODO: solve outprint issue with missing map entrys
+        //          i.e. string reading issue every number_of_columns loopcycle
+        //
+        if (map_str_to_chr_.find(chrom) != map_str_to_chr_.end()) {
+
+            chromosome = map_str_to_chr_[chrom];
+
+        } else {
+
+            map_str_to_chr_[chrom] = chrom_numerical_;
+            map_chr_to_str_[chrom_numerical_] = chrom;
+            chromosome = chrom_numerical_++;
+        }
+
+        // if necessary allocate more memory for matrix columns
+        if (line_counter_ > actually_reserved) {
+
+            matrix_.get_column(0).reserve(actually_reserved + V_CAP_STEPSIZE);
+            matrix_.get_column(1).reserve(actually_reserved + V_CAP_STEPSIZE);
+            matrix_.get_column(2).reserve(actually_reserved + V_CAP_STEPSIZE);
+            actually_reserved += V_CAP_STEPSIZE;
+        }
+
+        matrix_.get_column(0).push_back(chromosome);
+        matrix_.get_column(1).push_back(chrom_begin);
+        matrix_.get_column(2).push_back(chrom_end);
+
+        ++entry_number;
+    }
+
+    line_counter_ = entry_number / number_of_columns;
+
+    if (!feof(peak_file) || entry_number % number_of_columns) {
+
+        fprintf(stderr, ("\nA reading error occured while reading peak file \"" + file_path  + "\"\n").c_str());
+    }
+
+    fclose(peak_file);
 }
 
 
