@@ -21,10 +21,10 @@ int main(int argc, char* argv[]) {
     Controller controller;
 
     controller.parse_arguments(argc, argv);
-    controller.print_prev_read_data();
+    // controller.print_prev_read_data();
 
-    // controller.build_svm_model();
-    // controller.print_svm_model();
+    controller.build_svm_model();
+    controller.print_svm_model();
 
     return 0;
 }
@@ -336,6 +336,11 @@ void Controller::print_prev_read_data() {
 
 void Controller::build_svm_model() {
 
+    // normalize features on length of the region
+    reader_class_positive_set_.normalize_regions();
+    reader_class_negative_set_.normalize_regions();
+
+    // translate matrix into libsvm problem
     struct svm_problem* prob = construct_svm_problem(reader_class_positive_set_.get_prev_read_data(), reader_class_negative_set_.get_prev_read_data());
     fprintf(stdout, "Successfully constructed a SVM problem out of the given data.\n");
 
