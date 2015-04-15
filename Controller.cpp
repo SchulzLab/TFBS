@@ -279,7 +279,6 @@ void Controller::print_prev_read_data() {
 
     ofstream os;
     os.open("positive_samples.matrix");
-    os << "Data that has been read:\n";
     // wiggle file specific
     os << "gen\t" << "gen_start\t" << "gen_end\t";
 
@@ -287,12 +286,11 @@ void Controller::print_prev_read_data() {
 
         os << data_type_names_[i] << "\t";
     }
-    os << endl << endl;
+    os << endl;
     reader_class_positive_set_.print_prev_read_data(os);
     os.close();
 
     os.open("negative_samples.matrix");
-    os << "Data that has been read:\n";
     // wiggle file specific
     os << "gen\t" << "gen_start\t" << "gen_end\t";
 
@@ -300,7 +298,7 @@ void Controller::print_prev_read_data() {
 
         os << data_type_names_[i] << "\t";
     }
-    os << endl << endl;
+    os << endl;
     reader_class_negative_set_.print_prev_read_data(os);
     os.close();
 }
