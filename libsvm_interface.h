@@ -48,10 +48,11 @@ int labelset_distance(const struct svm_problem* prob, const double* predicted);
 // and the rest will be assigned to the training set)
 //
 // @param:  prob - the libsvm problem (data set) that should be splitted
+//          sample_links - link between corresponding samples in positive and negative set - see Reader.h
 //          training_set - empty svm_problem that will hold the training set
 //          eval_set - empty svm_problem that will hold the evaluation set
 //
-void split_training_set(const struct svm_problem* prob, struct svm_problem* training_set, struct svm_problem* eval_set);
+void split_training_set(const struct svm_problem* prob, const vector<int>& sample_links, struct svm_problem* training_set, struct svm_problem* eval_set);
 
 
 // evaluate a trained model on a given sample set

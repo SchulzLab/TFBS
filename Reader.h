@@ -80,6 +80,9 @@ class Reader
         // normalize feature values for each region to one bin
         void normalize_regions();
 
+        // get sample link vector - see private member "sample_links_" for more information
+        vector<int>& get_sample_links();
+
 
     private:
 
@@ -128,6 +131,12 @@ class Reader
 
         // internal counter for numerical values representing chromosomes in matrix
         int chrom_numerical_;
+
+        // linkage vector for bed files between negative and positive training set
+        // this should only been set in the negative training set
+        // vector[0] = matrix line in which the negative sample for the first positive sample is located
+        vector<int> sample_links_;
+
 };
 
 #endif /* READER_H */

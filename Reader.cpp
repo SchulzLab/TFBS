@@ -23,6 +23,7 @@ Reader::Reader() :
     ,   number_of_data_types_(0)
     ,   line_counter_(0)
     ,   chrom_numerical_(0)
+    ,   sample_links_()
 {
     init_chr_mapping();
 }
@@ -36,6 +37,7 @@ Reader::Reader(int number_of_data_types) :
     ,   number_of_data_types_(number_of_data_types)
     ,   line_counter_(0)
     ,   chrom_numerical_(0)
+    ,   sample_links_()
 {
     init_chr_mapping();
 }
@@ -50,10 +52,12 @@ Reader::Reader(Reader&& other_reader) :
     ,   map_str_to_chr_(other_reader.map_str_to_chr_)
     ,   map_chr_to_str_(other_reader.map_chr_to_str_)
     ,   chrom_numerical_(other_reader.chrom_numerical_)
+    ,   sample_links_(other_reader.sample_links_)
 {
     other_reader.matrix_ = Matrix<float>();
     other_reader.map_str_to_chr_ = unordered_map<string, int>();
     other_reader.map_chr_to_str_ = unordered_map<int, string>();
+    other_reader.sample_links_ = vector<int>();
 }
 
 
@@ -67,6 +71,7 @@ Reader& Reader::operator=(Reader&& other_reader){
     map_str_to_chr_ = move(other_reader.map_str_to_chr_);
     map_chr_to_str_ = move(other_reader.map_chr_to_str_);
     chrom_numerical_ = other_reader.chrom_numerical_;
+    sample_links_ = other_reader.sample_links_;
 
     return *this;
 }
@@ -80,7 +85,7 @@ Reader& Reader::operator=(Reader&& other_reader){
 //     bf::path directory(directory_path);
 //     bf::directory_iterator iterator_end;
 //
-//     // tests if path ist valid
+//     // tests if path is valid
 //     if (bf::exists(directory) && bf::is_directory(directory)) {
 //
 //         // iterate over all files contained in the directory
@@ -254,7 +259,7 @@ void Reader::read_simplebed_file(const string& file_path) {
 
     // read one line in the file per loop
     // skip the additional information of broadpeak format
-    while (fscanf(peak_file, "%s %d %d", chrom, &chrom_begin, &chrom_end) == 3) {
+    while (fscanf(peak_file, "%s %d %d %*d", chrom, &chrom_begin, &chrom_end) == 3) {
 
 
         ++line_counter_;
@@ -287,6 +292,23 @@ void Reader::read_simplebed_file(const string& file_path) {
     if (!feof(peak_file)) {
 
         fprintf(stderr, ("\nA reading error occured while reading peak file \"" + file_path  + "\"\n").c_str());
+    }
+
+    fclose(peak_file);
+
+    // open again for sample linkage
+    peak_file = fopen (file_path.c_str(), "r");
+
+    // init linkage vector for positive and negative training set
+    sample_links_.resize(line_counter_ + 1);
+
+    int sample_link;
+    int current_line = 0;
+    // fill vector
+    while (fscanf(peak_file, "%*s %*d %*d %d", &sample_link) == 1) {
+
+        sample_links_[sample_link] = current_line;
+        ++current_line;
     }
 
     fclose(peak_file);
@@ -885,4 +907,13 @@ void Reader::init_chr_mapping() {
     map_str_to_chr_["chrY"] = chrom_numerical_;
     map_str_to_chr_["Y"] = chrom_numerical_;
     map_chr_to_str_[chrom_numerical_++] = "Y";
+}
+
+
+
+
+
+vector<int>& Reader::get_sample_links() {
+
+    return sample_links_;
 }
