@@ -66,7 +66,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     // set flags and exit program if there are multiple files for the same operation
     for (int i = 0; i < argc; ++i) {
 
-        // NOTE: strcmp returns 0 if strings are equal
+        // note: strcmp returns 0 if strings are equal
         if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "-l")){
 
             ++number_of_data_types_;
@@ -318,7 +318,7 @@ void Controller::build_svm_model() {
 
     struct svm_problem* train_prob = (struct svm_problem*)(malloc(sizeof(*train_prob)));
     struct svm_problem* eval_prob = (struct svm_problem*)(malloc(sizeof(*eval_prob)));
-    split_training_set(prob, reader_class_negative_set_.get_sample_links(), train_prob, eval_prob);
+    split_training_set(prob, train_prob, eval_prob);
     fprintf(stdout, "Splitted data into evaluation and training set.\n");
 
     struct svm_parameter* params = train_params(train_prob);

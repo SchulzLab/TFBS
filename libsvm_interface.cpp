@@ -102,8 +102,8 @@ struct svm_parameter* construct_svm_param(double rbf_gamma, double svm_c) {
     params->svm_type = C_SVC;
     params->C = svm_c;
 
-    params->kernel_type = LINEAR;
-    // params->gamma = rbf_gamma;
+    params->kernel_type = RBF;
+    params->gamma = rbf_gamma;
 
     // cache size in MB
     params->cache_size = 50000;
@@ -115,7 +115,7 @@ struct svm_parameter* construct_svm_param(double rbf_gamma, double svm_c) {
     params->nr_weight = 0;
 
     // disable shrinking heuristics and probabilty estimates
-    params->shrinking = 1;
+    params->shrinking = 0;
     params->probability = 0;
 
     return params;
@@ -143,24 +143,25 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
 
 
     // train params in parallel
+    // outer loop: slack variable c 0,5% to 5% of training data in steps of 0.5%
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static,1) private(params, predicted) num_threads(16)
 #endif
-    for (int c = -6; c <= 6; ++c) {
-    int c = 6;
+    for (int c = -6; c <= -6; ++c) {
 
         // inner loop: rbf kernel parameter from 1 to 10^(-6)
         for (double gamma = 1; gamma >= 0.000001; gamma /= 10) {
 
+            // omp init
             params = construct_svm_param(0, 0);
-            predicted = (double*) malloc(sizeof(*predicted) * prob->l);
+            predicted = (double*) malloc(sizeof(*predicted) * prob->l * k_fold);
 
-            params->C = pow(10, c);
+            params->C = pow(10,c);
             params->gamma = gamma;
             svm_cross_validation(prob, params, k_fold, predicted);
 
+            // omp private
             int new_best;
-
             // if this is the best found set of parameters update the current best
 #ifdef _OPENMP
 #pragma omp critical
@@ -186,21 +187,15 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
 
 
 
-void split_training_set(const struct svm_problem* prob, const vector<int>& sample_links, struct svm_problem* training_set, struct svm_problem* eval_set) {
+void split_training_set(const struct svm_problem* prob, struct svm_problem* training_set, struct svm_problem* eval_set) {
 
     // init random seed for mersenne twister and make drawn values uniformally distributed in problem size range
     mt19937::result_type seed = 100;
-    auto dice_rand = std::bind(std::uniform_int_distribution<int>(0, (prob->l / 2) - 1), mt19937(seed));
+    auto dice_rand = std::bind(std::uniform_int_distribution<int>(0, prob->l - 1), mt19937(seed));
 
-    // split problem in evaluation and training set ( 50% training )
-    eval_set->l = prob->l/10 * 9;
-    // make set even
-    if ( (eval_set->l % 2) != 0 ) {
-
-        eval_set->l -= 1;
-    }
+    // split the size to get 10% of the set as evaluation set
+    eval_set->l = prob->l/10;
     training_set->l = prob->l - eval_set->l;
-
     // init sample flag memory
     eval_set->y = (double*)(malloc(eval_set->l * sizeof(*eval_set->y)));
     training_set->y = (double*)(malloc(training_set->l * sizeof(*training_set->y)));
@@ -212,7 +207,7 @@ void split_training_set(const struct svm_problem* prob, const vector<int>& sampl
     list<int> used_samples;
 
     // draw the evaluation set
-    for (int i = 0; i < eval_set->l / 2; ++i) {
+    for (int i = 0; i < eval_set->l; ++i) {
 
         // draw a sample and test if it has been drawn before
         int new_sample;
@@ -233,20 +228,15 @@ void split_training_set(const struct svm_problem* prob, const vector<int>& sampl
         } while(drawn_before);
 
         used_samples.push_back(new_sample);
-        // add positive sample to eval set
         eval_set->y[i] = prob->y[new_sample];
         eval_set->x[i] = prob->x[new_sample];
-
-        // add also the corresponding negative sample
-        eval_set->y[i + eval_set->l/2] = prob->y[prob->l/2 + sample_links[new_sample]];
-        eval_set->x[i + eval_set->l/2] = prob->x[prob->l/2 + sample_links[new_sample]];
     }
 
     // assign the training set
 
     // index for initial set which we try to split
     int prob_index = 0;
-    for (int i = 0; i < training_set->l / 2; ++i) {
+    for (int i = 0; i < training_set->l; ++i) {
 
         bool used_in_eval;
         do {
@@ -266,10 +256,6 @@ void split_training_set(const struct svm_problem* prob, const vector<int>& sampl
 
         training_set->y[i] = prob->y[prob_index];
         training_set->x[i] = prob->x[prob_index];
-
-        training_set->y[i + training_set->l/2] = prob->y[prob->l/2 + sample_links[prob_index]];
-        training_set->x[i + training_set->l/2] = prob->x[prob->l/2 + sample_links[prob_index]];
-
         ++prob_index;
     }
     // if (prob_index < prob->l - 1) {
