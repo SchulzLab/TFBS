@@ -16,6 +16,14 @@
 
 using namespace std;
 
+
+
+
+constexpr int PEAK_SIZE = 100;
+
+
+
+
 // namespace bf = boost::filesystem;
 
 Reader::Reader() :
@@ -208,8 +216,11 @@ void Reader::read_broadpeak_file(const string& file_path) {
         }
 
         matrix_.get_column(0).push_back(chromosome);
-        matrix_.get_column(1).push_back(chrom_begin);
-        matrix_.get_column(2).push_back(chrom_end);
+        const int middle = chrom_begin + (chrom_end - chrom_begin)/2;
+        int begin = middle - PEAK_SIZE;
+        int end = middle + PEAK_SIZE;
+        matrix_.get_column(1).push_back(begin);
+        matrix_.get_column(2).push_back(end);
 
     }
 
@@ -279,8 +290,11 @@ void Reader::read_simplebed_file(const string& file_path) {
         }
 
         matrix_.get_column(0).push_back(chromosome);
-        matrix_.get_column(1).push_back(chrom_begin);
-        matrix_.get_column(2).push_back(chrom_end);
+        const int middle = chrom_begin + (chrom_end - chrom_begin)/2;
+        int begin = middle - PEAK_SIZE;
+        int end = middle + PEAK_SIZE;
+        matrix_.get_column(1).push_back(begin);
+        matrix_.get_column(2).push_back(end);
 
     }
 
@@ -441,7 +455,7 @@ void Reader::normalize_regions() {
 
         for (int feature_ind = 3; feature_ind < matrix_.get_number_of_columns(); ++feature_ind) {
 
-            matrix_(sample_ind, feature_ind) /= region_size;
+            matrix_(sample_ind, feature_ind) = matrix_(sample_ind, feature_ind) / region_size;
         }
     }
 }

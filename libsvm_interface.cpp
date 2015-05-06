@@ -16,6 +16,7 @@ struct svm_problem* construct_svm_problem(Matrix<float>& positive_data, Matrix<f
     // initialize number of training data samples
     svm_prob->l = positive_data.get_number_of_lines() + negative_data.get_number_of_lines();
 
+
     // initialize an array containing the labels for all training data samples
     double* data_labels = (double*)malloc(sizeof(*data_labels) * svm_prob->l);
     svm_prob->y = data_labels;
@@ -88,6 +89,23 @@ struct svm_problem* construct_svm_problem(Matrix<float>& positive_data, Matrix<f
 
 
     svm_prob->x = &training_set[0];
+    // TODO
+    // cout << "\n\n\n";
+    // for (int i = 0; i < svm_prob->l; ++i) {
+    //
+    //     cout << "FLAG:   " << svm_prob->y[i] << endl;
+    //     cout << "FEATURES:   ";
+    //     int feature_index = 0;
+    //     while (svm_prob->x[i][feature_index].index != -1) {
+    //
+    //         cout << "(" << svm_prob->x[i][feature_index].index << ", " << svm_prob->x[i][feature_index].value << ")";
+    //         ++feature_index;
+    //     }
+    //     cout << endl;
+    // }
+    // cout << "\n\n\n";
+    // exit(1);
+
     return svm_prob;
 }
 
@@ -114,8 +132,8 @@ struct svm_parameter* construct_svm_param(double rbf_gamma, double svm_c) {
     // disable weighted data
     params->nr_weight = 0;
 
-    // disable shrinking heuristics and probabilty estimates
-    params->shrinking = 0;
+    // enable shrinking heuristics and disable probabilty estimates
+    params->shrinking = 1;
     params->probability = 0;
 
     return params;
@@ -147,7 +165,7 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static,1) private(params, predicted) num_threads(16)
 #endif
-    for (int c = -6; c <= -6; ++c) {
+    for (int c = -6; c <= 6; ++c) {
 
         // inner loop: rbf kernel parameter from 1 to 10^(-6)
         for (double gamma = 1; gamma >= 0.000001; gamma /= 10) {
@@ -156,17 +174,18 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
             params = construct_svm_param(0, 0);
             predicted = (double*) malloc(sizeof(*predicted) * prob->l * k_fold);
 
-            params->C = pow(10,c);
+            params->C = pow(10, c);
             params->gamma = gamma;
             svm_cross_validation(prob, params, k_fold, predicted);
 
             // omp private
-            int new_best;
+            int new_best = labelset_distance(prob, predicted);
+            cerr << new_best << "\n";
             // if this is the best found set of parameters update the current best
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-            if ((new_best = labelset_distance(prob, predicted)) < best_result) {
+            if (new_best < best_result) {
 
                 best_result = new_best;
                 best_params->C = c;
@@ -178,7 +197,7 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
         }
     }
 
-    cout << "\n\nBest C: " << best_params->C << "\nBest gamma: " << best_params->gamma << "\n\n";
+    cout << "\n\nBest C: " << best_params->C << "\nBest gamma: " << best_params->gamma << "\nDistance: " << best_result << "\n\n";
 
     return best_params;
 }
@@ -189,13 +208,11 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
 
 void split_training_set(const struct svm_problem* prob, struct svm_problem* training_set, struct svm_problem* eval_set) {
 
-    // init random seed for mersenne twister and make drawn values uniformally distributed in problem size range
-    mt19937::result_type seed = 100;
-    auto dice_rand = std::bind(std::uniform_int_distribution<int>(0, prob->l - 1), mt19937(seed));
 
-    // split the size to get 10% of the set as evaluation set
-    eval_set->l = prob->l/10;
+    // split the size to get 95% of the set as evaluation set
+    eval_set->l = prob->l/10 * 9.5;
     training_set->l = prob->l - eval_set->l;
+    cout  << "\nWhole set: " << prob->l << "\nEval set: " << eval_set->l << "\nTraining set: " << training_set->l << endl;
     // init sample flag memory
     eval_set->y = (double*)(malloc(eval_set->l * sizeof(*eval_set->y)));
     training_set->y = (double*)(malloc(training_set->l * sizeof(*training_set->y)));
@@ -207,7 +224,11 @@ void split_training_set(const struct svm_problem* prob, struct svm_problem* trai
     list<int> used_samples;
 
     // draw the evaluation set
-    for (int i = 0; i < eval_set->l; ++i) {
+    // draw positive samples
+    // init random seed for mersenne twister and make drawn values uniformally distributed in problem size range
+    mt19937::result_type seed = 100;
+    auto dice_rand_pos = std::bind(std::uniform_int_distribution<int>(0, (prob->l/2) - 1), mt19937(seed));
+    for (int i = 0; i < eval_set->l/2; ++i) {
 
         // draw a sample and test if it has been drawn before
         int new_sample;
@@ -215,7 +236,7 @@ void split_training_set(const struct svm_problem* prob, struct svm_problem* trai
         do {
 
             drawn_before = false;
-            new_sample = dice_rand();
+            new_sample = dice_rand_pos();
             for (int used_sample : used_samples) {
 
                 if (new_sample == used_sample) {
@@ -232,6 +253,37 @@ void split_training_set(const struct svm_problem* prob, struct svm_problem* trai
         eval_set->x[i] = prob->x[new_sample];
     }
 
+    auto dice_rand_neg = std::bind(std::uniform_int_distribution<int>(prob->l/2, prob->l - 1), mt19937(seed));
+    for (int i = eval_set->l/2; i < eval_set->l; ++i) {
+
+        // draw a sample and test if it has been drawn before
+        int new_sample;
+        bool drawn_before;
+        do {
+
+            drawn_before = false;
+            new_sample = dice_rand_neg();
+            for (int used_sample : used_samples) {
+
+                if (new_sample == used_sample) {
+
+                    drawn_before = true;
+                    break;
+                }
+            }
+
+        } while(drawn_before);
+
+        used_samples.push_back(new_sample);
+        eval_set->y[i] = prob->y[new_sample];
+        eval_set->x[i] = prob->x[new_sample];
+    }
+
+    // TODO
+    // for (int draw : used_samples) {
+    //
+    //     cout << "\n" << draw;
+    // }
     // assign the training set
 
     // index for initial set which we try to split
@@ -275,12 +327,14 @@ int labelset_distance(const struct svm_problem* prob, const double* predicted) {
 
     int distance = 0;
 
-    for (int index = 0; index < prob->l; ++index) {
+    for (int fold = 0; fold < k_fold; ++fold) {
+        for (int index = 0; index < prob->l; ++index) {
 
-        // libSVM seems to fill predicted with probabilitys for c_svm - change comparison?
-        if (prob->y[index] != predicted[index]) {
+            // compare flags assigned by the classifier
+            if (prob->y[index] != predicted[index + fold * prob->l]) {
 
-            ++distance;
+                ++distance;
+            }
         }
     }
 

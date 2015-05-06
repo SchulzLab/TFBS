@@ -269,6 +269,11 @@ void Controller::parse_arguments(int argc, char* argv[]) {
             reader_class_negative_set_.read_file(files_buffer[counter], counter, log_buffer[counter]);
         }
     }
+
+    // normalize features on length of the region
+    // reader_class_positive_set_.normalize_regions();
+    // reader_class_negative_set_.normalize_regions();
+
 }
 
 
@@ -307,10 +312,6 @@ void Controller::print_prev_read_data() {
 
 
 void Controller::build_svm_model() {
-
-    // normalize features on length of the region
-    reader_class_positive_set_.normalize_regions();
-    reader_class_negative_set_.normalize_regions();
 
     // translate matrix into libsvm problem
     struct svm_problem* prob = construct_svm_problem(reader_class_positive_set_.get_prev_read_data(), reader_class_negative_set_.get_prev_read_data());
