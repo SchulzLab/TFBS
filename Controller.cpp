@@ -270,9 +270,12 @@ void Controller::parse_arguments(int argc, char* argv[]) {
         }
     }
 
-    // normalize features on length of the region
-    // reader_class_positive_set_.normalize_regions();
-    // reader_class_negative_set_.normalize_regions();
+    ofstream of ("err.log");
+    reader_class_positive_set_.print_prev_read_data(of);
+    of.close();
+
+    reader_class_positive_set_.collateBinnedRegions();
+    reader_class_negative_set_.collateBinnedRegions();
 
 }
 
@@ -284,8 +287,7 @@ void Controller::print_prev_read_data() {
 
     ofstream os;
     os.open("positive_samples.matrix");
-    // wiggle file specific
-    os << "gen\t" << "gen_start\t" << "gen_end\t";
+    os << "chrom\t" << "gen_start\t" << "gen_end\t";
 
     for (int i = 0; i < number_of_data_types_; ++i) {
 
@@ -329,11 +331,14 @@ void Controller::build_svm_model() {
     // train actual model
     svm_ = svm_train(train_prob, params);
     fprintf(stdout, "Trained final model.\n");
-
+    pair<int, int> false_disc = evaluate_model(train_prob, eval_prob, svm_);
     fprintf(stdout, "\n\nAccuracy of the model:\n\
             Number of samples in the evaluation set: %d\n\
-            Number of falsely classified samples: %d\n"
-            , eval_prob->l, evaluate_model(eval_prob, svm_));
+            Number of falsely classified samples in evaluation set: %d\n\n\
+            Number of samples in the training set: %d\n\
+            Number of falsely classified samples in training set: %d\n\n\
+            Number of Support Vectors: %d\n"
+            , eval_prob->l, false_disc.first, train_prob->l, false_disc.second, svm_get_nr_sv(svm_));
 }
 
 

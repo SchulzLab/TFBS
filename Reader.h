@@ -66,7 +66,7 @@ class Reader
         void init_matrix(int num);
 
         // get matrix - i.e. get previously read data
-        Matrix<float>& get_prev_read_data();
+        Matrix<double>& get_prev_read_data();
         void print_prev_read_data(ostream& os);
 
         // get data in libSVM format
@@ -77,8 +77,11 @@ class Reader
         void get_as_libSVM_data(int* number_of_data_points, struct svm_node** data_points);
 
 
-        // normalize feature values for each region to one bin
-        void normalize_regions();
+        // rescale data such that all features have values between 0 and 1
+        void rescale_data();
+
+        // collates the binned regions, adds up only some of the bins to get value for former region
+        void collateBinnedRegions();
 
 
     private:
@@ -93,7 +96,7 @@ class Reader
         //         number of data_type (in wiggle files matrix columns = data type + 2)
         //         peak of the chromosome region
         //         boolean if peak should be treated as log ratio
-        void binary_search(const int chrom, const int chrom_begin, const int chromend, const int starting_point, const int end_point, const int data_type, const float peak, bool is_log);
+        void binary_search(const int chrom, const int chrom_begin, const int chromend, const int starting_point, const int end_point, const int data_type, const double peak, bool is_log);
 
         // initialize the mapping of external names for chromosomes used in files to internal
         // this is required to avoid problems matching different notations for the same chromosome in files of a single run
@@ -112,7 +115,7 @@ class Reader
         // for wiggle files this should be:
         //      for each genome region a different line containing
         //          genome_region_start   genome_region_end   peak_test_1  peak_test_2 ...
-        Matrix<float> matrix_;
+        Matrix<double> matrix_;
 
         // number of different data types
         // i.e. number of columns in matrix_

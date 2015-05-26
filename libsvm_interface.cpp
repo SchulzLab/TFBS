@@ -8,7 +8,7 @@
 
 
 
-struct svm_problem* construct_svm_problem(Matrix<float>& positive_data, Matrix<float>& negative_data) {
+struct svm_problem* construct_svm_problem(Matrix<double>& positive_data, Matrix<double>& negative_data) {
 
 
     struct svm_problem* svm_prob = (svm_problem*)malloc(sizeof(*svm_prob));
@@ -89,23 +89,6 @@ struct svm_problem* construct_svm_problem(Matrix<float>& positive_data, Matrix<f
 
 
     svm_prob->x = &training_set[0];
-    // TODO
-    // cout << "\n\n\n";
-    // for (int i = 0; i < svm_prob->l; ++i) {
-    //
-    //     cout << "FLAG:   " << svm_prob->y[i] << endl;
-    //     cout << "FEATURES:   ";
-    //     int feature_index = 0;
-    //     while (svm_prob->x[i][feature_index].index != -1) {
-    //
-    //         cout << "(" << svm_prob->x[i][feature_index].index << ", " << svm_prob->x[i][feature_index].value << ")";
-    //         ++feature_index;
-    //     }
-    //     cout << endl;
-    // }
-    // cout << "\n\n\n";
-    // exit(1);
-
     return svm_prob;
 }
 
@@ -165,7 +148,7 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static,1) private(params, predicted) num_threads(16)
 #endif
-    for (int c = -6; c <= 6; ++c) {
+    for (int c = -6; c <= 5; ++c) {
 
         // inner loop: rbf kernel parameter from 1 to 10^(-6)
         for (double gamma = 1; gamma >= 0.000001; gamma /= 10) {
@@ -279,11 +262,6 @@ void split_training_set(const struct svm_problem* prob, struct svm_problem* trai
         eval_set->x[i] = prob->x[new_sample];
     }
 
-    // TODO
-    // for (int draw : used_samples) {
-    //
-    //     cout << "\n" << draw;
-    // }
     // assign the training set
 
     // index for initial set which we try to split
@@ -310,13 +288,6 @@ void split_training_set(const struct svm_problem* prob, struct svm_problem* trai
         training_set->x[i] = prob->x[prob_index];
         ++prob_index;
     }
-    // if (prob_index < prob->l - 1) {
-    //
-    //     fprintf(stderr, "Error: Unsuccessfull splitting of the training set\n\
-    //             eval_samples: %d\n\
-    //             prob->l: %d\n\
-    //             prob index: %d\n", used_samples.size(), prob->l, prob_index);
-    // }
 }
 
 
@@ -345,19 +316,28 @@ int labelset_distance(const struct svm_problem* prob, const double* predicted) {
 
 
 
-int evaluate_model(const struct svm_problem* eval_prob, const svm_model* model) {
+pair<int, int> evaluate_model(const struct svm_problem* train_prob, const struct svm_problem* eval_prob, const svm_model* model) {
 
 
     // number of falsely classified samples
-    int f_flags = 0;
+    int f_flags_eval = 0;
 
     for (int i = 0; i < eval_prob->l; ++i) {
 
         if (svm_predict(model, eval_prob->x[i]) != eval_prob->y[i]) {
 
-            ++f_flags;
+            ++f_flags_eval;
         }
     }
 
-    return f_flags;
+    int f_flags_train = 0;
+
+    for (int i = 0; i < train_prob->l; ++i) {
+
+        if (svm_predict(model, train_prob->x[i]) != train_prob->y[i]) {
+
+            ++f_flags_train;
+        }
+    }
+    return pair<int, int> (f_flags_eval, f_flags_train);
 }

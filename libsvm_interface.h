@@ -11,7 +11,7 @@
 //
 // @return: svm_problem in libSVM struct
 //
-struct svm_problem* construct_svm_problem(Matrix<float>& positive_data, Matrix<float>& negative_data);
+struct svm_problem* construct_svm_problem(Matrix<double>& positive_data, Matrix<double>& negative_data);
 
 
 // initialize parameters for SVM in syntax of libSVM
@@ -61,7 +61,7 @@ void split_training_set(const struct svm_problem* prob, struct svm_problem* trai
 //
 // @return: the number of falsely classified samples
 //
-int evaluate_model(const struct svm_problem* eval_prob, const svm_model* model);
+pair<int, int> evaluate_model(const struct svm_problem* train_prob, const struct svm_problem* eval_prob, const svm_model* model);
 
 
 #endif /* LIBSVM_INTERFACE_H */
