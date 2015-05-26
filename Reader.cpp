@@ -24,9 +24,8 @@ constexpr int INITIAL_V_CAP = 700000;
 constexpr int V_CAP_STEPSIZE = 100000;
 
 // Binning information for regions
-constexpr int NUM_BINS = 10;
-constexpr int NUM_CHOSEN_BINS = 3;
-constexpr int DOMIN_FEATURE_COL = 0;
+constexpr int NUM_BINS = 1;
+constexpr int NUM_CHOSEN_BINS = 1;
 
 bool bin_comp (pair<double, int> a, pair<double, int> b) { return a.first < b.first; }
 
