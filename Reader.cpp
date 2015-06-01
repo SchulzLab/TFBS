@@ -445,41 +445,44 @@ void Reader::print_prev_read_data(ostream& os) {
 
 void Reader::collateBinnedRegions() {
 
-    Matrix<double> collated_matrix (line_counter_ / NUM_BINS, number_of_data_types_ + 3, 0);
+    if (NUM_BINS != 1) {
 
-    // collate all binned regions
-    for (int region_num = 0; region_num < line_counter_ / NUM_BINS; ++region_num) {
+        Matrix<double> collated_matrix (line_counter_ / NUM_BINS, number_of_data_types_ + 3, 0);
 
-        // init new matrix with top values
-        collated_matrix(region_num, 0) = matrix_(region_num * NUM_BINS, 0);
-        collated_matrix(region_num, 1) = matrix_(region_num * NUM_BINS, 1);
-        collated_matrix(region_num, 2) = matrix_(region_num * NUM_BINS + NUM_BINS - 1, 2);
-        // for each feature search the best bins
-        for (int feature = 3; feature < matrix_.get_number_of_columns(); ++feature) {
+        // collate all binned regions
+        for (int region_num = 0; region_num < line_counter_ / NUM_BINS; ++region_num) {
 
-            // get all bins of one region
-            vector<pair<double, int>> bins(NUM_BINS);
-            for (int bin_num = 0; bin_num < NUM_BINS; ++bin_num) {
+            // init new matrix with top values
+            collated_matrix(region_num, 0) = matrix_(region_num * NUM_BINS, 0);
+            collated_matrix(region_num, 1) = matrix_(region_num * NUM_BINS, 1);
+            collated_matrix(region_num, 2) = matrix_(region_num * NUM_BINS + NUM_BINS - 1, 2);
+            // for each feature search the best bins
+            for (int feature = 3; feature < matrix_.get_number_of_columns(); ++feature) {
 
-                bins[bin_num] = pair<double, int>(matrix_(region_num * NUM_BINS + bin_num, feature), bin_num);
-            }
+                // get all bins of one region
+                vector<pair<double, int>> bins(NUM_BINS);
+                for (int bin_num = 0; bin_num < NUM_BINS; ++bin_num) {
 
-            // sort into ascending order
-            sort(bins.begin(), bins.end(), bin_comp);
+                    bins[bin_num] = pair<double, int>(matrix_(region_num * NUM_BINS + bin_num, feature), bin_num);
+                }
 
-            // pick best bins
-            auto region_it = --bins.end();
-            for (int top_bin = 0; top_bin < NUM_CHOSEN_BINS; ++top_bin, --region_it) {
+                // sort into ascending order
+                sort(bins.begin(), bins.end(), bin_comp);
 
-                const int bin_region = region_num * NUM_BINS + region_it->second;
-                // collate and normalize on length
-                // collated_matrix(region_num, feature) += matrix_(bin_region, feature) / (matrix_(bin_region, 2) - matrix_(bin_region, 1));
-                collated_matrix(region_num, feature) += matrix_(bin_region, feature);
+                // pick best bins
+                auto region_it = --bins.end();
+                for (int top_bin = 0; top_bin < NUM_CHOSEN_BINS; ++top_bin, --region_it) {
+
+                    const int bin_region = region_num * NUM_BINS + region_it->second;
+                    // collate and normalize on length
+                    // collated_matrix(region_num, feature) += matrix_(bin_region, feature) / (matrix_(bin_region, 2) - matrix_(bin_region, 1));
+                    collated_matrix(region_num, feature) += matrix_(bin_region, feature);
+                }
             }
         }
+        matrix_ = move(collated_matrix);
+        line_counter_ /= NUM_BINS;
     }
-    matrix_ = move(collated_matrix);
-    line_counter_ /= NUM_BINS;
 }
 
 
