@@ -24,8 +24,8 @@ constexpr int INITIAL_V_CAP = 700000;
 constexpr int V_CAP_STEPSIZE = 100000;
 
 // Binning information for regions
-constexpr int NUM_BINS = 1;
-constexpr int NUM_CHOSEN_BINS = 1;
+constexpr int NUM_BINS = 24;
+constexpr int BIN_SIZE = 25;
 
 bool bin_comp (pair<double, int> a, pair<double, int> b) { return a.first < b.first; }
 
@@ -190,6 +190,9 @@ void Reader::read_broadpeak_file(const string& file_path) {
     matrix_.append_new_column(chrom_begin_v);
     matrix_.append_new_column(chrom_end_v);
 
+    // TODO test  buffer for overlapping regions
+    int last_chrom_reg = -(NUM_BINS * BIN_SIZE);
+
     // read one line in the file per loop
     // skip the additional information of broadpeak format
     while (fscanf(peak_file, "%s %d %d %*s %*s %*s %*s %*s %*s", chrom, &chrom_begin, &chrom_end) == 3) {
@@ -216,17 +219,21 @@ void Reader::read_broadpeak_file(const string& file_path) {
             actually_reserved += V_CAP_STEPSIZE;
         }
 
+        const int region_center = chrom_begin + (chrom_end - chrom_begin);
+        // TODO overlap tests
+        if (region_center - ((NUM_BINS/2)*BIN_SIZE) < last_chrom_reg) {
 
-        const int bin_size = (chrom_end - chrom_begin) / NUM_BINS;
-        for (int bin = 0; bin < NUM_BINS - 1; ++bin) {
+            cerr << "Overlap of region " << line_counter_/NUM_BINS << " with " << line_counter_/NUM_BINS - 1 << endl;
+        }
+
+        for (int bin = -(NUM_BINS/2); bin < (NUM_BINS/2); ++bin) {
 
             matrix_.get_column(0).push_back(chromosome);
-            matrix_.get_column(1).push_back(chrom_begin + bin * bin_size);
-            matrix_.get_column(2).push_back(chrom_begin + (bin + 1) * bin_size);
+            matrix_.get_column(1).push_back(region_center + bin * BIN_SIZE);
+            matrix_.get_column(2).push_back(region_center + (bin + 1) * BIN_SIZE);
         }
-        matrix_.get_column(0).push_back(chromosome);
-        matrix_.get_column(1).push_back(chrom_begin + (NUM_BINS - 1) * bin_size);
-        matrix_.get_column(2).push_back(chrom_end);
+        // TODO act. overlapping test buffer
+        last_chrom_reg = region_center + (NUM_BINS/2 * BIN_SIZE);
 
     }
 
@@ -264,6 +271,10 @@ void Reader::read_simplebed_file(const string& file_path) {
     matrix_.append_new_column(chrom_begin_v);
     matrix_.append_new_column(chrom_end_v);
 
+    // TODO test  buffer for overlapping regions
+    int last_chrom_reg = -(NUM_BINS * BIN_SIZE);
+    int last_chrom = -1;
+
     // read one line in the file per loop
     // skip the additional information of broadpeak format
     while (fscanf(peak_file, "%s %d %d", chrom, &chrom_begin, &chrom_end) == 3) {
@@ -281,6 +292,16 @@ void Reader::read_simplebed_file(const string& file_path) {
             chromosome = chrom_numerical_++;
         }
 
+        const int region_center = chrom_begin + (chrom_end - chrom_begin);
+        // TODO overlap tests
+        if (chromosome == last_chrom && region_center - ((NUM_BINS/2)*BIN_SIZE) < last_chrom_reg) {
+
+            cerr << "Overlap of region " << line_counter_/NUM_BINS << " with " << line_counter_/NUM_BINS - 1 << endl;
+            // skip this region
+            line_counter_ -= NUM_BINS;
+            continue;
+        }
+
         // if necessary allocate more memory for matrix columns
         if (line_counter_ > actually_reserved) {
 
@@ -290,16 +311,16 @@ void Reader::read_simplebed_file(const string& file_path) {
             actually_reserved += V_CAP_STEPSIZE;
         }
 
-        const int bin_size = (chrom_end - chrom_begin) / NUM_BINS;
-        for (int bin = 0; bin < NUM_BINS - 1; ++bin) {
+        for (int bin = -(NUM_BINS/2); bin < (NUM_BINS/2); ++bin) {
 
             matrix_.get_column(0).push_back(chromosome);
-            matrix_.get_column(1).push_back(chrom_begin + (bin * bin_size));
-            matrix_.get_column(2).push_back(chrom_begin + ((bin + 1) * bin_size));
+            matrix_.get_column(1).push_back(region_center + bin * BIN_SIZE);
+            matrix_.get_column(2).push_back(region_center + (bin + 1) * BIN_SIZE);
         }
-        matrix_.get_column(0).push_back(chromosome);
-        matrix_.get_column(1).push_back(chrom_begin + (NUM_BINS - 1) * bin_size);
-        matrix_.get_column(2).push_back(chrom_end);
+        // TODO act. overlapping test buffer
+        last_chrom_reg = region_center + (NUM_BINS/2 * BIN_SIZE);
+        last_chrom = chromosome;
+
     }
 
     if (!feof(peak_file)) {
@@ -447,41 +468,60 @@ void Reader::collateBinnedRegions() {
 
     if (NUM_BINS != 1) {
 
-        Matrix<double> collated_matrix (line_counter_ / NUM_BINS, number_of_data_types_ + 3, 0);
+        Matrix<double> collated_matrix (line_counter_ / NUM_BINS, number_of_data_types_ * NUM_BINS + 3, 0);
 
-        // collate all binned regions
-        for (int region_num = 0; region_num < line_counter_ / NUM_BINS; ++region_num) {
+        // iterate over all binned regions
+        for (int region_num = 0; region_num < line_counter_/ NUM_BINS; ++region_num) {
 
-            // init new matrix with top values
             collated_matrix(region_num, 0) = matrix_(region_num * NUM_BINS, 0);
             collated_matrix(region_num, 1) = matrix_(region_num * NUM_BINS, 1);
             collated_matrix(region_num, 2) = matrix_(region_num * NUM_BINS + NUM_BINS - 1, 2);
-            // for each feature search the best bins
-            for (int feature = 3; feature < matrix_.get_number_of_columns(); ++feature) {
 
-                // get all bins of one region
-                vector<pair<double, int>> bins(NUM_BINS);
-                for (int bin_num = 0; bin_num < NUM_BINS; ++bin_num) {
+            // convert row entries for all bins of this region to column entries
+            // make this for all features
+            for (int feature = 0; feature < number_of_data_types_; ++feature) {
 
-                    bins[bin_num] = pair<double, int>(matrix_(region_num * NUM_BINS + bin_num, feature), bin_num);
-                }
+                for (int bin = 0; bin < NUM_BINS; ++bin) {
 
-                // sort into ascending order
-                sort(bins.begin(), bins.end(), bin_comp);
-
-                // pick best bins
-                auto region_it = --bins.end();
-                for (int top_bin = 0; top_bin < NUM_CHOSEN_BINS; ++top_bin, --region_it) {
-
-                    const int bin_region = region_num * NUM_BINS + region_it->second;
-                    // collate and normalize on length
-                    // collated_matrix(region_num, feature) += matrix_(bin_region, feature) / (matrix_(bin_region, 2) - matrix_(bin_region, 1));
-                    collated_matrix(region_num, feature) += matrix_(bin_region, feature);
+                    collated_matrix(region_num, (feature * NUM_BINS) + bin + 3) = matrix_(region_num * NUM_BINS + bin, feature + 3);
                 }
             }
         }
+
+        // // collate all binned regions
+        // for (int region_num = 0; region_num < line_counter_ / NUM_BINS; ++region_num) {
+        //
+        //     // init new matrix with top values
+        //     collated_matrix(region_num, 0) = matrix_(region_num * NUM_BINS, 0);
+        //     collated_matrix(region_num, 1) = matrix_(region_num * NUM_BINS, 1);
+        //     collated_matrix(region_num, 2) = matrix_(region_num * NUM_BINS + NUM_BINS - 1, 2);
+        //     // for each feature search the best bins
+        //     for (int feature = 3; feature < matrix_.get_number_of_columns(); ++feature) {
+        //
+        //         // get all bins of one region
+        //         vector<pair<double, int>> bins(NUM_BINS);
+        //         for (int bin_num = 0; bin_num < NUM_BINS; ++bin_num) {
+        //
+        //             bins[bin_num] = pair<double, int>(matrix_(region_num * NUM_BINS + bin_num, feature), bin_num);
+        //         }
+        //
+        //         // sort into ascending order
+        //         sort(bins.begin(), bins.end(), bin_comp);
+        //
+        //         // pick best bins
+        //         auto region_it = --bins.end();
+        //         for (int top_bin = 0; top_bin < NUM_CHOSEN_BINS; ++top_bin, --region_it) {
+        //
+        //             const int bin_region = region_num * NUM_BINS + region_it->second;
+        //             // collate and normalize on length
+        //             // collated_matrix(region_num, feature) += matrix_(bin_region, feature) / (matrix_(bin_region, 2) - matrix_(bin_region, 1));
+        //             collated_matrix(region_num, feature) += matrix_(bin_region, feature);
+        //         }
+        //     }
+        // }
         matrix_ = move(collated_matrix);
         line_counter_ /= NUM_BINS;
+
     }
 }
 
@@ -500,17 +540,26 @@ Matrix<double>& Reader::get_prev_read_data() {
 
 void Reader::rescale_data() {
 
-    // search maxima
+    // search maxima and minima
     vector<double> max_val(number_of_data_types_);
+    vector<double> min_val(number_of_data_types_);
     for (int sample_ind = 0; sample_ind < matrix_.get_number_of_lines(); ++sample_ind) {
 
         for (int feature_ind = 0; feature_ind < matrix_.get_number_of_columns() - 3; ++feature_ind) {
 
             max_val[feature_ind] < matrix_(sample_ind, feature_ind + 3) ? max_val[feature_ind] = matrix_(sample_ind, feature_ind + 3) : 0;
+            min_val[feature_ind] > matrix_(sample_ind, feature_ind + 3) ? min_val[feature_ind] = matrix_(sample_ind, feature_ind + 3) : 0;
         }
     }
 
-    // TODO: Rescale
+    // rescale every feature
+    for (int sample_ind = 0; sample_ind < matrix_.get_number_of_lines(); ++sample_ind) {
+
+        for (int feature_ind = 0; feature_ind < matrix_.get_number_of_columns() - 3; ++feature_ind) {
+
+            matrix_(sample_ind, feature_ind + 3) = (matrix_(sample_ind, feature_ind + 3) - min_val[feature_ind])/(max_val[feature_ind] - min_val[feature_ind])
+        }
+    }
 }
 
 

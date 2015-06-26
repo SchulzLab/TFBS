@@ -78,6 +78,7 @@ class Reader
 
 
         // rescale data such that all features have values between 0 and 1
+        // min - max rescaling
         void rescale_data();
 
         // collates the binned regions, adds up only some of the bins to get value for former region
