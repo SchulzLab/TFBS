@@ -151,7 +151,7 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
     for (int c = -6; c <= 5; ++c) {
 
         // inner loop: rbf kernel parameter from 1 to 10^(-6)
-        for (double gamma = 1; gamma >= 0.000001; gamma /= 10) {
+        for (double gamma = pow(10,6); gamma >= pow(10,-10); gamma /= 10) {
 
             // omp init
             params = construct_svm_param(0, 0);
@@ -168,11 +168,13 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
 #ifdef _OPENMP
 #pragma omp critical
 #endif
+            {
             if (new_best < best_result) {
 
                 best_result = new_best;
-                best_params->C = c;
+                best_params->C = pow(10, c);
                 best_params->gamma = gamma;
+            }
             }
 
             free(predicted);
@@ -192,8 +194,8 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
 void split_training_set(const struct svm_problem* prob, struct svm_problem* training_set, struct svm_problem* eval_set) {
 
 
-    // split the size to get 95% of the set as evaluation set
-    eval_set->l = prob->l/10 * 9.5;
+    // split the size to get 75% of the set as evaluation set
+    eval_set->l = prob->l/10 * 7.5;
     training_set->l = prob->l - eval_set->l;
     cout  << "\nWhole set: " << prob->l << "\nEval set: " << eval_set->l << "\nTraining set: " << training_set->l << endl;
     // init sample flag memory
