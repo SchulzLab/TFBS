@@ -270,10 +270,8 @@ void Controller::parse_arguments(int argc, char* argv[]) {
         }
     }
 
-    ofstream of ("err.log");
-    reader_class_positive_set_.print_prev_read_data(of);
-    of.close();
-
+    reader_class_positive_set_.rescale_data();
+    reader_class_negative_set_.rescale_data();
     reader_class_positive_set_.collateBinnedRegions();
     reader_class_negative_set_.collateBinnedRegions();
 
