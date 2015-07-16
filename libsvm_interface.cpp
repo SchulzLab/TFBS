@@ -151,7 +151,7 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
     for (int c = -6; c <= 5; ++c) {
 
         // inner loop: rbf kernel parameter from 1 to 10^(-6)
-        for (double gamma = pow(10,6); gamma >= pow(10,-10); gamma /= 10) {
+        for (double gamma = pow(10,6); gamma >= pow(10,-6); gamma /= 10) {
 
             // omp init
             params = construct_svm_param(0, 0);

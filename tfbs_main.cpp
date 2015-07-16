@@ -16,6 +16,8 @@ int main(int argc, char* argv[]) {
     controller.build_svm_model();
     controller.print_svm_model();
 
+    controller.apply_svm_model();
+
     return 0;
 }
 
