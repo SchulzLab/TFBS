@@ -20,6 +20,7 @@ Controller::Controller() :
     ,   data_type_names_()
     ,   reader_class_positive_set_()
     ,   reader_class_negative_set_()
+    ,   reader_class_apply_()
     ,   model_output_file_("")
 {
 }
@@ -30,8 +31,11 @@ Controller::Controller() :
 
 Controller::~Controller() {
 
-    svm_free_model_content(svm_);
-    svm_free_and_destroy_model(&svm_);
+    if (training_ || to_apply_) {
+
+        svm_free_model_content(svm_);
+        svm_free_and_destroy_model(&svm_);
+    }
 }
 
 
@@ -49,6 +53,11 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     // file with not-log ratio values
     bool file_flag_wolog = false;
 
+    to_apply_ = false;
+    // should training be made
+    training_ = false;
+
+    bool model_given = false;
 
     bool directory_flag = false;
     // region file flag
@@ -113,21 +122,32 @@ void Controller::parse_arguments(int argc, char* argv[]) {
         }
     }
 
+    training_ = peak_flag && (negative_matrix_flag || negative_data_flag);
+
+    reader_class_apply_ = Reader(number_of_data_types_);
+
     reader_class_positive_set_ = Reader(number_of_data_types_);
     reader_class_negative_set_ = Reader(number_of_data_types_);
 
-    if (!peak_flag) {
-
-        fprintf(stderr, "No peak file (-p or -b) given.");
-        exit(EXIT_FAILURE);
-    }
 
     // scan files and directory arguments
-    while ((c = getopt(argc, argv, "m:t:n:p:b:l:f:d:o:")) != - 1) {
+    while ((c = getopt(argc, argv, "x:a:m:t:n:p:b:l:f:d:o:")) != - 1) {
 
         switch (c) {
 
+            // apply on this model
+            case 'x':
 
+                svm_ = svm_load_model(optarg);
+                model_given = true;
+                break;
+
+            // apply on this set
+            case 'a':
+
+                reader_class_apply_.read_simplebed_file(optarg);
+                to_apply_ = true;
+                break;
 
             case 'n':
 
@@ -183,7 +203,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
             case '?':
 
-                if (optopt == 'm' || optopt == 't' || optopt == 'n' || optopt == 'b' || optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'o' || optopt == 'l') {
+                if (optopt == 'x' || optopt == 'a' || optopt == 'm' || optopt == 't' || optopt == 'n' || optopt == 'b' || optopt == 'p' || optopt == 'f' || optopt == 'd' || optopt == 'o' || optopt == 'l') {
 
                     fprintf(stderr, "Missing argument for -%c option.\n", optopt);
                 } else {
@@ -246,34 +266,59 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     vector<bool> log_buffer(begin(log_ratio_), end(log_ratio_));
     vector<string> files_buffer(begin(files_), end(files_));
 
-    // read files
-    // init matrix
-    reader_class_positive_set_.init_matrix(number_of_data_types_);
-#ifdef _OPENMP
-#pragma omp parallel for schedule(static,1) num_threads(16)
-#endif
-    for (int counter = 0; counter < number_of_data_types_; ++counter) {
+    // do only if svm should be trained
+    if (training_) {
 
-        reader_class_positive_set_.read_file(files_buffer[counter], counter, log_buffer[counter]);
-    }
-
-    // read files again to build negative training samples
-    if (negative_data_flag) {
-
-        reader_class_negative_set_.init_matrix(number_of_data_types_);
+        // read files
+        // init matrix
+        reader_class_positive_set_.init_matrix(number_of_data_types_);
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static,1) num_threads(16)
 #endif
         for (int counter = 0; counter < number_of_data_types_; ++counter) {
 
-            reader_class_negative_set_.read_file(files_buffer[counter], counter, log_buffer[counter]);
+            reader_class_positive_set_.read_file(files_buffer[counter], counter, log_buffer[counter]);
         }
+
+        // read files again to build negative training samples
+        if (negative_data_flag) {
+
+            reader_class_negative_set_.init_matrix(number_of_data_types_);
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static,1) num_threads(16)
+#endif
+            for (int counter = 0; counter < number_of_data_types_; ++counter) {
+
+                reader_class_negative_set_.read_file(files_buffer[counter], counter, log_buffer[counter]);
+            }
+            reader_class_negative_set_.rescale_data();
+            reader_class_negative_set_.collateBinnedRegions();
+        }
+
+        reader_class_positive_set_.rescale_data();
+        reader_class_positive_set_.collateBinnedRegions();
     }
 
-    reader_class_positive_set_.rescale_data();
-    reader_class_negative_set_.rescale_data();
-    reader_class_positive_set_.collateBinnedRegions();
-    reader_class_negative_set_.collateBinnedRegions();
+    // if the model should be applied read the data for the new regions
+    if (to_apply_) {
+
+        if (!(training_ || model_given)) {
+
+            fprintf(stderr, "No model or training data provided!.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        reader_class_apply_.init_matrix(number_of_data_types_);
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static,1) num_threads(16)
+#endif
+        for (int counter = 0; counter < number_of_data_types_; ++counter) {
+
+            reader_class_apply_.read_file(files_buffer[counter], counter, log_buffer[counter]);
+        }
+        reader_class_apply_.rescale_data();
+        reader_class_apply_.collateBinnedRegions();
+    }
 
 }
 
@@ -313,30 +358,37 @@ void Controller::print_prev_read_data() {
 
 void Controller::build_svm_model() {
 
-    // translate matrix into libsvm problem
-    struct svm_problem* prob = construct_svm_problem(reader_class_positive_set_.get_prev_read_data(), reader_class_negative_set_.get_prev_read_data());
-    fprintf(stdout, "Successfully constructed a SVM problem out of the given data.\n");
+    if (training_) {
+        // translate matrix into libsvm problem
+        struct svm_problem* prob = construct_svm_problem(reader_class_positive_set_.get_prev_read_data(), reader_class_negative_set_.get_prev_read_data());
+        fprintf(stdout, "Successfully constructed a SVM problem out of the given data.\n");
 
-    struct svm_problem* train_prob = (struct svm_problem*)(malloc(sizeof(*train_prob)));
-    struct svm_problem* eval_prob = (struct svm_problem*)(malloc(sizeof(*eval_prob)));
-    split_training_set(prob, train_prob, eval_prob);
-    fprintf(stdout, "Splitted data into evaluation and training set.\n");
+        struct svm_problem* train_prob = (struct svm_problem*)(malloc(sizeof(*train_prob)));
+        struct svm_problem* eval_prob = (struct svm_problem*)(malloc(sizeof(*eval_prob)));
+        split_training_set(prob, train_prob, eval_prob);
+        fprintf(stdout, "Splitted data into evaluation and training set.\n");
 
-    struct svm_parameter* params = train_params(train_prob);
-    fprintf(stdout, "Trained SVM parameters.\n");
+        struct svm_parameter* params = train_params(train_prob);
+        fprintf(stdout, "Trained SVM parameters.\n");
 
 
-    // train actual model
-    svm_ = svm_train(train_prob, params);
-    fprintf(stdout, "Trained final model.\n");
-    pair<int, int> false_disc = evaluate_model(train_prob, eval_prob, svm_);
-    fprintf(stdout, "\n\nAccuracy of the model:\n\
-            Number of samples in the evaluation set: %d\n\
-            Number of falsely classified samples in evaluation set: %d\n\n\
-            Number of samples in the training set: %d\n\
-            Number of falsely classified samples in training set: %d\n\n\
-            Number of Support Vectors: %d\n"
-            , eval_prob->l, false_disc.first, train_prob->l, false_disc.second, svm_get_nr_sv(svm_));
+        // train actual model
+        svm_ = svm_train(train_prob, params);
+        fprintf(stdout, "Trained final model.\n");
+        pair<int, int> false_disc = evaluate_model(train_prob, eval_prob, svm_);
+        fprintf(stdout, "\n\nAccuracy of the model:\n\
+                Number of samples in the evaluation set: %d\n\
+                Number of falsely classified samples in evaluation set: %d\n\n\
+                Number of samples in the training set: %d\n\
+                Number of falsely classified samples in training set: %d\n\n\
+                Number of Support Vectors: %d\n"
+                , eval_prob->l, false_disc.first, train_prob->l, false_disc.second, svm_get_nr_sv(svm_));
+        ofstream of("result.info");
+        of << "eval set " << eval_prob->l << "\nfalsely classified: " << false_disc.first <<
+            "\n\ntraining set " << train_prob->l << "\nfalsely classified: " << false_disc.second <<
+            "\n\noptimal params: C = " << params->C << "     gamma = " << params->gamma << endl;
+        of.close();
+    }
 }
 
 
@@ -344,11 +396,55 @@ void Controller::build_svm_model() {
 
 void Controller::print_svm_model() {
 
-    if (model_output_file_ != "") {
+    if (training_) {
 
-        if (svm_save_model(model_output_file_.c_str(), svm_) != 0) {
+        if (model_output_file_ != "") {
 
-            fprintf(stderr, ("An error occured while saving the SVM model to " + model_output_file_ + "\n").c_str());
+            if (svm_save_model(model_output_file_.c_str(), svm_) != 0) {
+
+                fprintf(stderr, ("An error occured while saving the SVM model to " + model_output_file_ + "\n").c_str());
+            }
         }
     }
+}
+
+
+
+
+void Controller::apply_svm_model() {
+
+    // if there is no data to apply skip
+    if (!to_apply_) {
+
+        return;
+    }
+
+
+    fprintf(stdout, "Apply model.\n");
+
+    Matrix<double> dummy = Matrix<double>();
+    struct svm_problem* feature_matrix = construct_svm_problem(reader_class_apply_.get_prev_read_data(), dummy);
+
+    vector<int> predicted_flags(feature_matrix->l, -1);
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static,1) num_threads(20)
+#endif
+    for (int i = 0; i < feature_matrix->l; ++i) {
+
+        predicted_flags[i] = svm_predict(svm_, feature_matrix->x[i]);
+    }
+
+    ofstream result_file("openChrom_call_flags");
+
+    for (int i = 0; i < predicted_flags.size(); ++i) {
+
+        if (predicted_flags[i] == 1) {
+
+            result_file << "1\n";
+        } else {
+
+            result_file << "0\n";
+        }
+    }
+    result_file.close();
 }

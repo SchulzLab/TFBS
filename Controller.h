@@ -40,6 +40,11 @@ class Controller {
         // outputs the svm_model to model_output_file
         void print_svm_model();
 
+        // apply the model to data saved in reader_class_apply_
+        //
+        // called open Chromatin regions will be saved as flags congruent to the given file in openChrom_call_flags
+        void apply_svm_model();
+
     private:
 
         // number of data types that will be read
@@ -56,6 +61,12 @@ class Controller {
         // Reader for the positive and negative training data set
         Reader reader_class_positive_set_;
         Reader reader_class_negative_set_;
+        // Reader for the set that the model should be applied to
+        // and the flag if there was a file provided for the appliance
+        Reader reader_class_apply_;
+        bool to_apply_;
+        // flag if training should be done
+        bool training_;
 
         // trained svm model
         struct svm_model* svm_;
