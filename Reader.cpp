@@ -24,8 +24,8 @@ constexpr int INITIAL_V_CAP = 700000;
 constexpr int V_CAP_STEPSIZE = 100000;
 
 // Binning information for regions
-constexpr int NUM_BINS = 24;
-constexpr int BIN_SIZE = 25;
+constexpr int NUM_BINS = 4;
+constexpr int BIN_SIZE = 150;
 
 bool bin_comp (pair<double, int> a, pair<double, int> b) { return a.first < b.first; }
 
@@ -219,7 +219,7 @@ void Reader::read_broadpeak_file(const string& file_path) {
             actually_reserved += V_CAP_STEPSIZE;
         }
 
-        const int region_center = chrom_begin + (chrom_end - chrom_begin);
+        const int region_center = chrom_begin + (chrom_end - chrom_begin) / 2;
         // TODO overlap tests
         if (region_center - ((NUM_BINS/2)*BIN_SIZE) < last_chrom_reg) {
 
@@ -292,7 +292,7 @@ void Reader::read_simplebed_file(const string& file_path) {
             chromosome = chrom_numerical_++;
         }
 
-        const int region_center = chrom_begin + (chrom_end - chrom_begin);
+        const int region_center = chrom_begin + (chrom_end - chrom_begin)/2;
         // TODO overlap tests
         if (chromosome == last_chrom && region_center - ((NUM_BINS/2)*BIN_SIZE) < last_chrom_reg) {
 
@@ -557,7 +557,7 @@ void Reader::rescale_data() {
 
         for (int feature_ind = 0; feature_ind < matrix_.get_number_of_columns() - 3; ++feature_ind) {
 
-            matrix_(sample_ind, feature_ind + 3) = (matrix_(sample_ind, feature_ind + 3) - min_val[feature_ind])/(max_val[feature_ind] - min_val[feature_ind])
+            matrix_(sample_ind, feature_ind + 3) = (matrix_(sample_ind, feature_ind + 3) - min_val[feature_ind])/(max_val[feature_ind] - min_val[feature_ind]);
         }
     }
 }
