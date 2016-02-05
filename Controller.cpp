@@ -359,6 +359,7 @@ void Controller::print_prev_read_data() {
 void Controller::build_svm_model() {
 
     if (training_) {
+
         // translate matrix into libsvm problem
         struct svm_problem* prob = construct_svm_problem(reader_class_positive_set_.get_prev_read_data(), reader_class_negative_set_.get_prev_read_data());
         fprintf(stdout, "Successfully constructed a SVM problem out of the given data.\n");
@@ -375,19 +376,25 @@ void Controller::build_svm_model() {
         // train actual model
         svm_ = svm_train(train_prob, params);
         fprintf(stdout, "Trained final model.\n");
-        pair<int, int> false_disc = evaluate_model(train_prob, eval_prob, svm_);
-        fprintf(stdout, "\n\nAccuracy of the model:\n\
-                Number of samples in the evaluation set: %d\n\
-                Number of falsely classified samples in evaluation set: %d\n\n\
-                Number of samples in the training set: %d\n\
-                Number of falsely classified samples in training set: %d\n\n\
-                Number of Support Vectors: %d\n"
-                , eval_prob->l, false_disc.first, train_prob->l, false_disc.second, svm_get_nr_sv(svm_));
-        ofstream of("result.info");
-        of << "eval set " << eval_prob->l << "\nfalsely classified: " << false_disc.first <<
-            "\n\ntraining set " << train_prob->l << "\nfalsely classified: " << false_disc.second <<
-            "\n\noptimal params: C = " << params->C << "     gamma = " << params->gamma << endl;
-        of.close();
+
+        FILE * result_out;
+        result_out = fopen("result_summary.txt", "w+");
+
+        pair<Matrix<int>,Matrix<int> > confusion = evaluate_model(train_prob, eval_prob, svm_);
+        fprintf(result_out, "\n\nConfusion matrix test set:\n\n\
+\t\t\t\t model outcome\n\
+\t\t\t\tP\tN\n\
+real outcome\tP\t%d\t%d\n\
+\t\t\tN\t%d\t%d\n\n\
+\n\nConfusion matrix train set:\n\
+\t\t\t\t model outcome\n\
+\t\t\t\tP\tN\n\
+real outcome\tP\t%d\t%d\n\
+\t\t\tN\t%d\t%d\n\n\
+Number of Support Vectors: %d\n"
+                , confusion.first(0,0), confusion.first(0,1), confusion.first(1,0), confusion.first(1,1)
+                ,confusion.second(0,0), confusion.second(0,1), confusion.second(1,0), confusion.second(1,1)
+                ,svm_get_nr_sv(svm_));
     }
 }
 
