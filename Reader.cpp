@@ -24,8 +24,8 @@ constexpr int INITIAL_V_CAP = 700000;
 constexpr int V_CAP_STEPSIZE = 100000;
 
 // Binning information for regions
-constexpr int NUM_BINS = 4;
-constexpr int BIN_SIZE = 150;
+constexpr int NUM_BINS = 6;
+constexpr int BIN_SIZE = 100;
 
 bool bin_comp (pair<double, int> a, pair<double, int> b) { return a.first < b.first; }
 
@@ -566,6 +566,331 @@ void Reader::rescale_data() {
 
 
 
+// TODO TODO TODO fix everywhere
+//
+// TODO: implement raw read count based on peak and remove partial peak -> safer and better performance
+// void Reader::binary_search(const int chrom, const int chrom_begin, const int chrom_end, const int start_point, const int end_point, const int data_type, const double peak, bool is_log) {
+//
+//
+//     // termination
+//     if (start_point > end_point) {
+//
+//         return;
+//     }
+//
+//     // center of one vector
+//     const int central_point = start_point + ((end_point - start_point) / 2);
+//
+//     // tests if query is on the same chromosome as new sample
+//     if (matrix_(central_point, 0) == chrom) {
+//
+//         // region overlap tests between query and sample
+//         if (matrix_(central_point, 1) >= chrom_begin) {
+//
+//             if (matrix_(central_point, 1) == chrom_begin) {
+//
+//                 // sample:  |---|
+//                 // query:   |---|
+//                 //  or
+//                 // sample:  |--|
+//                 // query:   |---|
+//                 if (matrix_(central_point, 2) >= chrom_end) {
+//
+//                     if (is_log) {
+//
+//                         matrix_(central_point, data_type + 3) += pow(2, peak);
+//
+//                     } else {
+//
+//                         matrix_(central_point, data_type + 3) += peak;
+//                     }
+//
+//                 // sample: |----|
+//                 // query:  |---|
+//                 } else {
+//
+//                     // remaining peak value
+//                     double partial_peak_buffer;
+//                     double partial_peak;
+//
+//                     if (is_log) {
+//
+//                         // peak value that overlaps with the query
+//                         partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * pow(2, peak);
+//                         matrix_(central_point, data_type + 3) += partial_peak;
+//                         partial_peak_buffer = pow(2, peak) - partial_peak;
+//
+//                     } else {
+//
+//                         partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
+//                         matrix_(central_point, data_type + 3) += partial_peak;
+//                         partial_peak_buffer = peak - partial_peak;
+//
+//                     }
+//
+//
+//                     // increase position in each step by one
+//                     int i = 1;
+//                     int mod_start = matrix_(central_point, 2);
+//
+//                     while (central_point + i <= line_counter_ - 1 && matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
+//
+//                         if (matrix_(central_point + i, 2) >= chrom_end) {
+//
+//                             partial_peak = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+//                             matrix_(central_point, data_type + 3) += partial_peak;
+//                             break;
+//
+//                         } else {
+//
+//                             partial_peak = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+//                             matrix_(central_point + i, data_type + 3) += partial_peak;
+//                             partial_peak_buffer -= partial_peak;
+//                             mod_start = matrix_(central_point + i, 2);
+//                             ++i;
+//                         }
+//                     }
+//                 }
+//
+//             // matrix(central_point, 1) > chrom_begin
+//             } else {
+//
+//                 if (matrix_(central_point, 1) < chrom_end) {
+//
+//                     // sample:  |---|
+//                     // query:    |-|
+//                     if (matrix_(central_point, 2) < chrom_end) {
+//
+//                         // remaining peak value
+//                         double partial_peak_buffer;
+//
+//                         if (is_log) {
+//
+//                             // peak value that overlaps with the query
+//                             const double partial_peak = (double)(matrix_(central_point, 2) - matrix_(central_point, 1))/(chrom_end - chrom_begin) * pow(2, peak);
+//                             matrix_(central_point, data_type + 3) += partial_peak;
+//
+//                             partial_peak_buffer = (double)(matrix_(central_point, 1) - chrom_begin)/(chrom_end - chrom_begin) * pow(2, peak);
+//
+//                         } else {
+//
+//                             // peak value that overlaps with the query
+//                             const double partial_peak = (double)(matrix_(central_point, 2) - matrix_(central_point, 1))/(chrom_end - chrom_begin) * peak;
+//                             matrix_(central_point, data_type + 3) += partial_peak;
+//
+//                             partial_peak_buffer = (double)(matrix_(central_point, 1) - chrom_begin)/(chrom_end - chrom_begin) * peak;
+//                         }
+//
+//
+//                         // overlap of left side
+//                         int i = 1;
+//                         int mod_end = matrix_(central_point, 1);
+//
+//                         while (central_point - i >= 0 && matrix_(central_point - i, 0) == chrom && matrix_(central_point - i, 2) > chrom_begin) {
+//
+//                             if (matrix_(central_point - i, 1) <= chrom_begin) {
+//
+//                                 const double partial_peak_left = (double)(matrix_(central_point - i, 2) - chrom_begin)/(mod_end - chrom_begin) * partial_peak_buffer;
+//                                 matrix_(central_point - i, data_type + 3) += partial_peak_left;
+//                                 break;
+//
+//                             } else {
+//
+//                                 const double partial_peak_left = (double)(matrix_(central_point - i, 2) - matrix_(central_point - i, 1))/(mod_end - chrom_begin) * partial_peak_buffer;
+//                                 matrix_(central_point - i, data_type + 3) += partial_peak_left;
+//                                 partial_peak_buffer -= partial_peak_left;
+//                                 mod_end = matrix_(central_point - i, 1);
+//                                 ++i;
+//                             }
+//                         }
+//
+//
+//                         if (is_log) {
+//
+//                             partial_peak_buffer = (double)(chrom_end - matrix_(central_point, 2))/(chrom_end - chrom_begin) * pow(2, peak);
+//
+//                         } else {
+//
+//                             partial_peak_buffer = (double)(chrom_end - matrix_(central_point, 2))/(chrom_end - chrom_begin) * peak;
+//
+//                         }
+//
+//
+//                         // overlap of right side
+//                         i = 1;
+//                         int mod_start = matrix_(central_point, 2);
+//
+//                         while (central_point + i <= line_counter_ - 1 && matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
+//
+//                             if (matrix_(central_point + i, 2) >= chrom_end) {
+//
+//                                 const double partial_peak_right = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+//                                 matrix_(central_point + i, data_type + 3) += partial_peak_right;
+//                                 break;
+//
+//                             } else {
+//
+//                                 const double partial_peak_right = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+//                                 matrix_(central_point + i, data_type + 3) += partial_peak_right;
+//                                 partial_peak_buffer -= partial_peak_right;
+//                                 mod_start = matrix_(central_point + i, 2);
+//                                 ++i;
+//                             }
+//                         }
+//
+//
+//                     // sample:  |----|
+//                     // query:     |---|
+//                     //  or
+//                     // sample:  |---|
+//                     // query:     |-|
+//                     //  or
+//                     // sample:  |---|
+//                     // query:       |--|
+//                     } else {
+//
+//                         double partial_peak_buffer;
+//                         double partial_peak;
+//
+//                         if (is_log) {
+//
+//                             // peak value that overlaps with the query
+//                             partial_peak = (double)(chrom_end - matrix_(central_point, 1))/(chrom_end - chrom_begin) * pow(2, peak);
+//                             matrix_(central_point, data_type + 3) += partial_peak;
+//                             partial_peak_buffer = pow(2, peak) - partial_peak;
+//
+//                         } else {
+//
+//                             // peak value that overlaps with the query
+//                             partial_peak = (double)(chrom_end - matrix_(central_point, 1))/(chrom_end - chrom_begin) * peak;
+//                             matrix_(central_point, data_type + 3) += partial_peak;
+//                             partial_peak_buffer = peak - partial_peak;
+//
+//                         }
+//
+//                         int i = 1;
+//                         int mod_end = matrix_(central_point, 1);
+//
+//                         while (central_point - i >= 0 && matrix_(central_point - i, 0) == chrom && matrix_(central_point - i, 2) > chrom_begin) {
+//
+//                             if (matrix_(central_point - i, 1) <= chrom_begin) {
+//
+//                                 partial_peak = (double)(matrix_(central_point - i, 2) - chrom_begin)/(mod_end - chrom_begin) * partial_peak_buffer;
+//                                 matrix_(central_point - i, data_type + 3) += partial_peak;
+//                                 break;
+//
+//                             } else {
+//
+//                                 partial_peak = (double)(matrix_(central_point - i, 2) - matrix_(central_point - i, 1))/(mod_end - chrom_begin) * partial_peak_buffer;
+//                                 matrix_(central_point - i, data_type + 3) += partial_peak;
+//                                 partial_peak_buffer -= partial_peak;
+//                                 mod_end = matrix_(central_point - i, 1);
+//                                 ++i;
+//                             }
+//                         }
+//                     }
+//
+//                 // sample: |---|
+//                 // query:        |---|
+//                 } else {
+//
+//                     binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak, is_log);
+//                 }
+//
+//             }
+//
+//         // matrix_(central_point, 1) < chrom_begin
+//         } else {
+//
+//             // sample:        |---|
+//             // query:   |---|
+//             if (matrix_(central_point, 2) <= chrom_begin) {
+//
+//                 binary_search(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, peak, is_log);
+//
+//             // matrix_(central_point, 2) > chrom_begin
+//             } else {
+//
+//                 // sample:   |--|
+//                 // query:  |----|
+//                 //  or
+//                 // sample:   |--|
+//                 // query:  |------|
+//                 if (matrix_(central_point, 2) >= chrom_end) {
+//
+//                     if (is_log) {
+//
+//                         matrix_(central_point, data_type + 3) += pow(2, peak);
+//
+//                     } else {
+//
+//                         matrix_(central_point, data_type + 3) += peak;
+//
+//                     }
+//
+//                 // sample:   |---|
+//                 // query:  |---|
+//                 } else {
+//
+//                     double partial_peak;
+//                     double partial_peak_buffer;
+//
+//                     if (is_log) {
+//
+//                         // peak value that overlaps with the query
+//                         partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * pow(2, peak);
+//                         partial_peak_buffer = pow(2, peak) - partial_peak;
+//                         matrix_(central_point, data_type + 3) += partial_peak;
+//
+//                     } else {
+//
+//                         // peak value that overlaps with the query
+//                         partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
+//                         partial_peak_buffer = peak - partial_peak;
+//                         matrix_(central_point, data_type + 3) += partial_peak;
+//
+//                     }
+//
+//                     int i = 1;
+//                     int mod_start = matrix_(central_point, 2);
+//
+//                     while (central_point + i<= line_counter_ - 1 && matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
+//
+//                         if (matrix_(central_point + i, 2) >= chrom_end) {
+//
+//                             partial_peak = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+//                             matrix_(central_point + i, data_type + 3) += partial_peak;
+//                             break;
+//
+//                         } else {
+//
+//                             partial_peak = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+//                             matrix_(central_point + i, data_type + 3) += partial_peak;
+//                             partial_peak_buffer -= partial_peak;
+//                             mod_start = matrix_(central_point + i, 2);
+//                             ++i;
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//
+//     } else {
+//
+//         // sample:        |---|
+//         // query:   |---|
+//         if (matrix_(central_point, 0) < chrom) {
+//
+//             binary_search(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, peak, is_log);
+//
+//         // sample:  |---|
+//         // query:         |---|
+//         } else {
+//
+//             binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak, is_log);
+//         }
+//     }
+// }
 void Reader::binary_search(const int chrom, const int chrom_begin, const int chrom_end, const int start_point, const int end_point, const int data_type, const double peak, bool is_log) {
 
 
@@ -575,7 +900,7 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
         return;
     }
 
-    // center of one vector
+    // center for binary search jump
     const int central_point = start_point + ((end_point - start_point) / 2);
 
     // tests if query is on the same chromosome as new sample
@@ -593,57 +918,33 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 // query:   |---|
                 if (matrix_(central_point, 2) >= chrom_end) {
 
-                    if (is_log) {
-
-                        matrix_(central_point, data_type + 3) += pow(2, peak);
-
-                    } else {
-
-                        matrix_(central_point, data_type + 3) += peak;
-                    }
+                    matrix_(central_point, data_type + 3) += (is_log ? pow(2, peak) : peak);
 
                 // sample: |----|
                 // query:  |---|
                 } else {
 
-                    // remaining peak value
-                    double partial_peak_buffer;
-                    double partial_peak;
 
-                    if (is_log) {
-
-                        // peak value that overlaps with the query
-                        partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * pow(2, peak);
-                        matrix_(central_point, data_type + 3) += partial_peak;
-                        partial_peak_buffer = pow(2, peak) - partial_peak;
-
-                    } else {
-
-                        partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
-                        matrix_(central_point, data_type + 3) += partial_peak;
-                        partial_peak_buffer = peak - partial_peak;
-
-                    }
+                    // peak value that overlaps with the query
+                    const double partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                    matrix_(central_point, data_type + 3) += partial_peak;
 
 
                     // increase position in each step by one
                     int i = 1;
-                    int mod_start = matrix_(central_point, 2);
 
                     while (central_point + i <= line_counter_ - 1 && matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
 
                         if (matrix_(central_point + i, 2) >= chrom_end) {
 
-                            partial_peak = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
-                            matrix_(central_point, data_type + 3) += partial_peak;
+                            const double partial_peak2 = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                            matrix_(central_point, data_type + 3) += partial_peak2;
                             break;
 
                         } else {
 
-                            partial_peak = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
-                            matrix_(central_point + i, data_type + 3) += partial_peak;
-                            partial_peak_buffer -= partial_peak;
-                            mod_start = matrix_(central_point + i, 2);
+                            const double partial_peak2 = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                            matrix_(central_point + i, data_type + 3) += partial_peak2;
                             ++i;
                         }
                     }
@@ -658,82 +959,45 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                     // query:    |-|
                     if (matrix_(central_point, 2) < chrom_end) {
 
-                        // remaining peak value
-                        double partial_peak_buffer;
-
-                        if (is_log) {
-
-                            // peak value that overlaps with the query
-                            const double partial_peak = (double)(matrix_(central_point, 2) - matrix_(central_point, 1))/(chrom_end - chrom_begin) * pow(2, peak);
-                            matrix_(central_point, data_type + 3) += partial_peak;
-
-                            partial_peak_buffer = (double)(matrix_(central_point, 1) - chrom_begin)/(chrom_end - chrom_begin) * pow(2, peak);
-
-                        } else {
-
-                            // peak value that overlaps with the query
-                            const double partial_peak = (double)(matrix_(central_point, 2) - matrix_(central_point, 1))/(chrom_end - chrom_begin) * peak;
-                            matrix_(central_point, data_type + 3) += partial_peak;
-
-                            partial_peak_buffer = (double)(matrix_(central_point, 1) - chrom_begin)/(chrom_end - chrom_begin) * peak;
-                        }
+                        // peak value that overlaps with the query
+                        const double partial_peak = (double)(matrix_(central_point, 2) - matrix_(central_point, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                        matrix_(central_point, data_type + 3) += partial_peak;
 
 
                         // overlap of left side
                         int i = 1;
-                        int mod_end = matrix_(central_point, 1);
 
                         while (central_point - i >= 0 && matrix_(central_point - i, 0) == chrom && matrix_(central_point - i, 2) > chrom_begin) {
 
                             if (matrix_(central_point - i, 1) <= chrom_begin) {
 
-                                const double partial_peak_left = (double)(matrix_(central_point - i, 2) - chrom_begin)/(mod_end - chrom_begin) * partial_peak_buffer;
+                                const double partial_peak_left = (double)(matrix_(central_point - i, 2) - chrom_begin)/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
                                 matrix_(central_point - i, data_type + 3) += partial_peak_left;
                                 break;
 
                             } else {
 
-                                const double partial_peak_left = (double)(matrix_(central_point - i, 2) - matrix_(central_point - i, 1))/(mod_end - chrom_begin) * partial_peak_buffer;
+                                const double partial_peak_left = (double)(matrix_(central_point - i, 2) - matrix_(central_point - i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
                                 matrix_(central_point - i, data_type + 3) += partial_peak_left;
-                                // TODO TODO TODO fix everywhere
-                                //
-                                // TODO: fix that... peak should be (mod_end - chrom_begin)/(chrom_end - chrom_begin)*peak
-                                partial_peak_buffer -= partial_peak_left;
-                                mod_end = matrix_(central_point - i, 1);
                                 ++i;
                             }
                         }
 
-
-                        if (is_log) {
-
-                            partial_peak_buffer = (double)(chrom_end - matrix_(central_point, 2))/(chrom_end - chrom_begin) * pow(2, peak);
-
-                        } else {
-
-                            partial_peak_buffer = (double)(chrom_end - matrix_(central_point, 2))/(chrom_end - chrom_begin) * peak;
-
-                        }
-
-
                         // overlap of right side
                         i = 1;
-                        int mod_start = matrix_(central_point, 2);
 
                         while (central_point + i <= line_counter_ - 1 && matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
 
                             if (matrix_(central_point + i, 2) >= chrom_end) {
 
-                                const double partial_peak_right = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+                                const double partial_peak_right = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
                                 matrix_(central_point + i, data_type + 3) += partial_peak_right;
                                 break;
 
                             } else {
 
-                                const double partial_peak_right = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
+                                const double partial_peak_right = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
                                 matrix_(central_point + i, data_type + 3) += partial_peak_right;
-                                partial_peak_buffer -= partial_peak_right;
-                                mod_start = matrix_(central_point + i, 2);
                                 ++i;
                             }
                         }
@@ -749,42 +1013,24 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                     // query:       |--|
                     } else {
 
-                        double partial_peak_buffer;
-                        double partial_peak;
-
-                        if (is_log) {
-
-                            // peak value that overlaps with the query
-                            partial_peak = (double)(chrom_end - matrix_(central_point, 1))/(chrom_end - chrom_begin) * pow(2, peak);
-                            matrix_(central_point, data_type + 3) += partial_peak;
-                            partial_peak_buffer = pow(2, peak) - partial_peak;
-
-                        } else {
-
-                            // peak value that overlaps with the query
-                            partial_peak = (double)(chrom_end - matrix_(central_point, 1))/(chrom_end - chrom_begin) * peak;
-                            matrix_(central_point, data_type + 3) += partial_peak;
-                            partial_peak_buffer = peak - partial_peak;
-
-                        }
+                        // peak value that overlaps with the query
+                        const double partial_peak = (double)(chrom_end - matrix_(central_point, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                        matrix_(central_point, data_type + 3) += partial_peak;
 
                         int i = 1;
-                        int mod_end = matrix_(central_point, 1);
 
                         while (central_point - i >= 0 && matrix_(central_point - i, 0) == chrom && matrix_(central_point - i, 2) > chrom_begin) {
 
                             if (matrix_(central_point - i, 1) <= chrom_begin) {
 
-                                partial_peak = (double)(matrix_(central_point - i, 2) - chrom_begin)/(mod_end - chrom_begin) * partial_peak_buffer;
-                                matrix_(central_point - i, data_type + 3) += partial_peak;
+                                const double partial_peak2 = (double)(matrix_(central_point - i, 2) - chrom_begin)/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                                matrix_(central_point - i, data_type + 3) += partial_peak2;
                                 break;
 
                             } else {
 
-                                partial_peak = (double)(matrix_(central_point - i, 2) - matrix_(central_point - i, 1))/(mod_end - chrom_begin) * partial_peak_buffer;
-                                matrix_(central_point - i, data_type + 3) += partial_peak;
-                                partial_peak_buffer -= partial_peak;
-                                mod_end = matrix_(central_point - i, 1);
+                                const double partial_peak2 = (double)(matrix_(central_point - i, 2) - matrix_(central_point - i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                                matrix_(central_point - i, data_type + 3) += partial_peak2;
                                 ++i;
                             }
                         }
@@ -818,56 +1064,32 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
                 // query:  |------|
                 if (matrix_(central_point, 2) >= chrom_end) {
 
-                    if (is_log) {
+                    matrix_(central_point, data_type + 3) += (is_log ? pow(2, peak) : peak);
 
-                        matrix_(central_point, data_type + 3) += pow(2, peak);
-
-                    } else {
-
-                        matrix_(central_point, data_type + 3) += peak;
-
-                    }
 
                 // sample:   |---|
                 // query:  |---|
                 } else {
 
-                    double partial_peak;
-                    double partial_peak_buffer;
+                    // peak value that overlaps with the query
+                    const double partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                    matrix_(central_point, data_type + 3) += partial_peak;
 
-                    if (is_log) {
-
-                        // peak value that overlaps with the query
-                        partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * pow(2, peak);
-                        partial_peak_buffer = pow(2, peak) - partial_peak;
-                        matrix_(central_point, data_type + 3) += partial_peak;
-
-                    } else {
-
-                        // peak value that overlaps with the query
-                        partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
-                        partial_peak_buffer = peak - partial_peak;
-                        matrix_(central_point, data_type + 3) += partial_peak;
-
-                    }
 
                     int i = 1;
-                    int mod_start = matrix_(central_point, 2);
 
                     while (central_point + i<= line_counter_ - 1 && matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
 
                         if (matrix_(central_point + i, 2) >= chrom_end) {
 
-                            partial_peak = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
-                            matrix_(central_point + i, data_type + 3) += partial_peak;
+                            const double partial_peak2 = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                            matrix_(central_point + i, data_type + 3) += partial_peak2;
                             break;
 
                         } else {
 
-                            partial_peak = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
-                            matrix_(central_point + i, data_type + 3) += partial_peak;
-                            partial_peak_buffer -= partial_peak;
-                            mod_start = matrix_(central_point + i, 2);
+                            const double partial_peak2 = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                            matrix_(central_point + i, data_type + 3) += partial_peak2;
                             ++i;
                         }
                     }
@@ -890,6 +1112,236 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
             binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak, is_log);
         }
     }
+}
+
+
+
+
+
+// TODO TODO TODO
+void Reader::binary_search_mean(const int chrom, const int chrom_begin, const int chrom_end, const int start_point, const int end_point, const int data_type, const double value) {
+
+    // termination
+    if (start_point > end_point) {
+
+        return;
+    }
+
+    // center for binary search jump
+    const int central_point = start_point + ((end_point - start_point) / 2);
+
+    // tests if query is on the same chromosome as new sample
+    if (matrix_(central_point, 0) == chrom) {
+
+        // region overlap tests between query and sample
+        if (matrix_(central_point, 1) >= chrom_begin) {
+
+            if (matrix_(central_point, 1) == chrom_begin) {
+
+                // sample:  |---|
+                // query:   |---|
+                //  or
+                // sample:  |--|
+                // query:   |---|
+                if (matrix_(central_point, 2) >= chrom_end) {
+
+                    matrix_(central_point, data_type + 3) += (is_log ? pow(2, peak) : peak);
+
+                // sample: |----|
+                // query:  |---|
+                } else {
+
+
+                    // peak value that overlaps with the query
+                    const double partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                    matrix_(central_point, data_type + 3) += partial_peak;
+
+
+                    // increase position in each step by one
+                    int i = 1;
+
+                    while (central_point + i <= line_counter_ - 1 && matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
+
+                        if (matrix_(central_point + i, 2) >= chrom_end) {
+
+                            const double partial_peak2 = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                            matrix_(central_point, data_type + 3) += partial_peak2;
+                            break;
+
+                        } else {
+
+                            const double partial_peak2 = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                            matrix_(central_point + i, data_type + 3) += partial_peak2;
+                            ++i;
+                        }
+                    }
+                }
+
+            // matrix(central_point, 1) > chrom_begin
+            } else {
+
+                if (matrix_(central_point, 1) < chrom_end) {
+
+                    // sample:  |---|
+                    // query:    |-|
+                    if (matrix_(central_point, 2) < chrom_end) {
+
+                        // peak value that overlaps with the query
+                        const double partial_peak = (double)(matrix_(central_point, 2) - matrix_(central_point, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                        matrix_(central_point, data_type + 3) += partial_peak;
+
+
+                        // overlap of left side
+                        int i = 1;
+
+                        while (central_point - i >= 0 && matrix_(central_point - i, 0) == chrom && matrix_(central_point - i, 2) > chrom_begin) {
+
+                            if (matrix_(central_point - i, 1) <= chrom_begin) {
+
+                                const double partial_peak_left = (double)(matrix_(central_point - i, 2) - chrom_begin)/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                                matrix_(central_point - i, data_type + 3) += partial_peak_left;
+                                break;
+
+                            } else {
+
+                                const double partial_peak_left = (double)(matrix_(central_point - i, 2) - matrix_(central_point - i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                                matrix_(central_point - i, data_type + 3) += partial_peak_left;
+                                ++i;
+                            }
+                        }
+
+                        // overlap of right side
+                        i = 1;
+
+                        while (central_point + i <= line_counter_ - 1 && matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
+
+                            if (matrix_(central_point + i, 2) >= chrom_end) {
+
+                                const double partial_peak_right = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                                matrix_(central_point + i, data_type + 3) += partial_peak_right;
+                                break;
+
+                            } else {
+
+                                const double partial_peak_right = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                                matrix_(central_point + i, data_type + 3) += partial_peak_right;
+                                ++i;
+                            }
+                        }
+
+
+                    // sample:  |----|
+                    // query:     |---|
+                    //  or
+                    // sample:  |---|
+                    // query:     |-|
+                    //  or
+                    // sample:  |---|
+                    // query:       |--|
+                    } else {
+
+                        // peak value that overlaps with the query
+                        const double partial_peak = (double)(chrom_end - matrix_(central_point, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                        matrix_(central_point, data_type + 3) += partial_peak;
+
+                        int i = 1;
+
+                        while (central_point - i >= 0 && matrix_(central_point - i, 0) == chrom && matrix_(central_point - i, 2) > chrom_begin) {
+
+                            if (matrix_(central_point - i, 1) <= chrom_begin) {
+
+                                const double partial_peak2 = (double)(matrix_(central_point - i, 2) - chrom_begin)/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                                matrix_(central_point - i, data_type + 3) += partial_peak2;
+                                break;
+
+                            } else {
+
+                                const double partial_peak2 = (double)(matrix_(central_point - i, 2) - matrix_(central_point - i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                                matrix_(central_point - i, data_type + 3) += partial_peak2;
+                                ++i;
+                            }
+                        }
+                    }
+
+                // sample: |---|
+                // query:        |---|
+                } else {
+
+                    binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak, is_log);
+                }
+
+            }
+
+        // matrix_(central_point, 1) < chrom_begin
+        } else {
+
+            // sample:        |---|
+            // query:   |---|
+            if (matrix_(central_point, 2) <= chrom_begin) {
+
+                binary_search(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, peak, is_log);
+
+            // matrix_(central_point, 2) > chrom_begin
+            } else {
+
+                // sample:   |--|
+                // query:  |----|
+                //  or
+                // sample:   |--|
+                // query:  |------|
+                if (matrix_(central_point, 2) >= chrom_end) {
+
+                    matrix_(central_point, data_type + 3) += (is_log ? pow(2, peak) : peak);
+
+
+                // sample:   |---|
+                // query:  |---|
+                } else {
+
+                    // peak value that overlaps with the query
+                    const double partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                    matrix_(central_point, data_type + 3) += partial_peak;
+
+
+                    int i = 1;
+
+                    while (central_point + i<= line_counter_ - 1 && matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
+
+                        if (matrix_(central_point + i, 2) >= chrom_end) {
+
+                            const double partial_peak2 = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                            matrix_(central_point + i, data_type + 3) += partial_peak2;
+                            break;
+
+                        } else {
+
+                            const double partial_peak2 = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - chrom_begin) * (is_log ? pow(2, peak) : peak);
+                            matrix_(central_point + i, data_type + 3) += partial_peak2;
+                            ++i;
+                        }
+                    }
+                }
+            }
+        }
+
+    } else {
+
+        // sample:        |---|
+        // query:   |---|
+        if (matrix_(central_point, 0) < chrom) {
+
+            binary_search(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, peak, is_log);
+
+        // sample:  |---|
+        // query:         |---|
+        } else {
+
+            binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak, is_log);
+        }
+    }
+
+
+
 }
 
 

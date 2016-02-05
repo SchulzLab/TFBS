@@ -72,7 +72,7 @@ class Reader
         // get data in libSVM format
         //
         // @param: (will later hold the result)
-        //          number_of_data_points - _number of data points hence size of the following vector
+        //          number_of_data_points - _number of data points, i.e. size of the following vector
         //          data_points - vector of data points, each holding all features. see libSVM for more info
         void get_as_libSVM_data(int* number_of_data_points, struct svm_node** data_points);
 
@@ -88,34 +88,29 @@ class Reader
     private:
 
 
-        // search in matrix for given genome region, compute overlap and save peak
+        // search in matrix for given genome region, compute overlap and save
+        // binary_search computes overlap for raw read counts (or log transformed raw counts)
+        // binary_search_mean computes overlap for values that reflect a mean of a region
         //
         // called by   read_file
         //
         // @param: chromosome region start and end point
         //         starting point and end point for binary search
         //         number of data_type (in wiggle files matrix columns = data type + 2)
-        //         peak of the chromosome region
+        //         read count of the chromosome region
         //         boolean if peak should be treated as log ratio
         void binary_search(const int chrom, const int chrom_begin, const int chromend, const int starting_point, const int end_point, const int data_type, const double peak, bool is_log);
+        void binary_search_mean(const int chrom, const int chrom_begin, const int chrom_end, const int start_point, const int end_point, const int data_type, const double value);
 
         // initialize the mapping of external names for chromosomes used in files to internal
         // this is required to avoid problems matching different notations for the same chromosome in files of a single run
         void init_chr_mapping();
 
 
-
-        // since we have a strongly modified version of binary search we need
-        // to remember if we've just did a right or left jump for the binary search
-        // to avoid endless recursive descent
-        // bool gone_right = false;
-        // bool gone_left = false;
-
-
         // matrix that holds data that have been read
         // for wiggle files this should be:
         //      for each genome region a different line containing
-        //          genome_region_start   genome_region_end   peak_test_1  peak_test_2 ...
+        //          genome_region_start   genome_region_end   overlap_assay_1  overlap_assay_2 ...
         Matrix<double> matrix_;
 
         // number of different data types
