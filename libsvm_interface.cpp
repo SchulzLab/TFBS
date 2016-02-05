@@ -3,9 +3,13 @@
 #include <functional> // bind
 #include <list>
 
+#include <fstream>
+
 #include "libsvm_interface.h"
 
 
+// part divided by 10 that should be used for the evaluation set
+const float EVAL_SET_SIZE = 8;
 
 
 struct svm_problem* construct_svm_problem(Matrix<double>& positive_data, Matrix<double>& negative_data) {
@@ -142,20 +146,21 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
     // init best_result worse than worst case (i.e. in every run is everything wrong + 1)
     int best_result = (k_fold * prob->l) + 1;
 
+    ofstream os("log");
+    os << "C_log10\tgamma\tdistance" << endl;
 
+    // SEARCH GRID
     // train params in parallel
-    // outer loop: slack variable c 0,5% to 5% of training data in steps of 0.5%
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static,1) private(params, predicted) num_threads(16)
 #endif
     for (int c = -6; c <= 5; ++c) {
 
-        // inner loop: rbf kernel parameter from 1 to 10^(-6)
         for (double gamma = pow(10,6); gamma >= pow(10,-6); gamma /= 10) {
 
             // omp init
             params = construct_svm_param(0, 0);
-            predicted = (double*) malloc(sizeof(*predicted) * prob->l * k_fold);
+            predicted = (double*) malloc(sizeof(*predicted) * prob->l);
 
             params->C = pow(10, c);
             params->gamma = gamma;
@@ -169,6 +174,7 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
 #pragma omp critical
 #endif
             {
+            os << c << "\t" << gamma << "\t" << new_best << endl;
             if (new_best < best_result) {
 
                 best_result = new_best;
@@ -180,6 +186,44 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
             free(predicted);
 
         }
+    }
+
+
+    // REFINED GRID FOR GAMMA
+
+    double g = best_params->gamma;
+    double fine_grid[] = {0.125, 0.25, 0.5, 2, 4, 8};
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static,1) private(params, predicted) num_threads(16)
+#endif
+    for (int grid_index = 0; grid_index <= 5; ++grid_index) {
+
+        // omp init
+        params = construct_svm_param(0, 0);
+        predicted = (double*) malloc(sizeof(*predicted) * prob->l);
+
+        params->C = best_params->C;
+        params->gamma = g * fine_grid[grid_index];
+        svm_cross_validation(prob, params, k_fold, predicted);
+
+        // omp private
+        int new_best = labelset_distance(prob, predicted);
+        cerr << new_best << "\n";
+        // if this is the best found set of parameters update the current best
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+        {
+        os << best_params->C << "\t" << params->gamma << "\t" << new_best << endl;
+        if (new_best < best_result) {
+
+            best_result = new_best;
+            best_params->gamma = params->gamma;
+        }
+        }
+
+        free(predicted);
+
     }
 
     cout << "\n\nBest C: " << best_params->C << "\nBest gamma: " << best_params->gamma << "\nDistance: " << best_result << "\n\n";
@@ -194,8 +238,8 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
 void split_training_set(const struct svm_problem* prob, struct svm_problem* training_set, struct svm_problem* eval_set) {
 
 
-    // split the size to get 75% of the set as evaluation set
-    eval_set->l = prob->l/10 * 7.5;
+    // split the size to get 10% of the set as evaluation set
+    eval_set->l = prob->l/10 * EVAL_SET_SIZE;
     training_set->l = prob->l - eval_set->l;
     cout  << "\nWhole set: " << prob->l << "\nEval set: " << eval_set->l << "\nTraining set: " << training_set->l << endl;
     // init sample flag memory
@@ -300,15 +344,23 @@ int labelset_distance(const struct svm_problem* prob, const double* predicted) {
 
     int distance = 0;
 
-    for (int fold = 0; fold < k_fold; ++fold) {
-        for (int index = 0; index < prob->l; ++index) {
+    // for (int fold = 0; fold < k_fold; ++fold) {
+    //     for (int index = 0; index < prob->l; ++index) {
+    //
+    //         // compare flags assigned by the classifier
+    //         if (prob->y[index] != predicted[index + fold * prob->l]) {
+    //
+    //             ++distance;
+    //         }
+    //     }
+    // }
+    for (int index = 0; index < prob->l; ++index) {
 
-            // compare flags assigned by the classifier
-            if (prob->y[index] != predicted[index + fold * prob->l]) {
+        if (prob->y[index] != predicted[index]) {
 
-                ++distance;
-            }
+            ++distance;
         }
+
     }
 
     return distance;
@@ -318,28 +370,42 @@ int labelset_distance(const struct svm_problem* prob, const double* predicted) {
 
 
 
-pair<int, int> evaluate_model(const struct svm_problem* train_prob, const struct svm_problem* eval_prob, const svm_model* model) {
+pair<Matrix<int>,Matrix<int> > evaluate_model(const struct svm_problem* train_prob, const struct svm_problem* eval_prob, const svm_model* model) {
 
 
-    // number of falsely classified samples
-    int f_flags_eval = 0;
+    // confusion matrix
+    //                          model outcome
+    //                          P    N
+    //     real outcome    P    TP   FN
+    //                     N    FP   TN
+    Matrix<int> confusion_test (2,2,0);
+    Matrix<int> confusion_train (2,2,0);
 
     for (int i = 0; i < eval_prob->l; ++i) {
 
-        if (svm_predict(model, eval_prob->x[i]) != eval_prob->y[i]) {
+        double pred = svm_predict(model, eval_prob->x[i]);
+        double outcome = eval_prob->y[i];
+        if (pred == 1) {
 
-            ++f_flags_eval;
+            pred == outcome ? ++confusion_test(0,0) : ++confusion_test(1,0);
+        } else {
+
+            pred == outcome ? ++confusion_test(1,1) : ++confusion_test(0,1);
         }
     }
 
-    int f_flags_train = 0;
 
     for (int i = 0; i < train_prob->l; ++i) {
 
-        if (svm_predict(model, train_prob->x[i]) != train_prob->y[i]) {
+        double pred = svm_predict(model, train_prob->x[i]);
+        double outcome = train_prob->y[i];
+        if (pred == 1) {
 
-            ++f_flags_train;
+            pred == outcome ? ++confusion_train(0,0) : ++confusion_train(1,0);
+        } else {
+
+            pred == outcome ? ++confusion_train(1,1) : ++confusion_train(0,1);
         }
     }
-    return pair<int, int> (f_flags_eval, f_flags_train);
+    return pair<Matrix<int>, Matrix<int> > (confusion_test, confusion_train);
 }

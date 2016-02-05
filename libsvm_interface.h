@@ -61,7 +61,7 @@ void split_training_set(const struct svm_problem* prob, struct svm_problem* trai
 //
 // @return: the number of falsely classified samples
 //
-pair<int, int> evaluate_model(const struct svm_problem* train_prob, const struct svm_problem* eval_prob, const svm_model* model);
+pair<Matrix<int>, Matrix<int> > evaluate_model(const struct svm_problem* train_prob, const struct svm_problem* eval_prob, const svm_model* model);
 
 
 #endif /* LIBSVM_INTERFACE_H */
