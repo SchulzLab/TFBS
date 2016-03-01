@@ -24,8 +24,8 @@ constexpr int INITIAL_V_CAP = 400000;
 constexpr int V_CAP_STEPSIZE = 100000;
 
 // Binning information for regions
-constexpr int NUM_BINS = 4;
-constexpr int BIN_SIZE = 75;
+constexpr int NUM_BINS = 2;
+constexpr int BIN_SIZE = 300;
 
 bool bin_comp (pair<double, int> a, pair<double, int> b) { return a.first < b.first; }
 
@@ -195,11 +195,11 @@ vector<bool> Reader::read_mean_file(const string& file_path, int data_type) {
         if (avg_counter_[counter] > 0) {
 
             matrix_(counter, data_type + 3) /= avg_counter_[counter];
-            empty_bin_info[counter % NUM_BINS] = empty_bin_info[counter % NUM_BINS] && true;
+            empty_bin_info[counter / NUM_BINS] = empty_bin_info[counter / NUM_BINS] && true;
 
         } else {
 
-            empty_bin_info[counter % NUM_BINS] = false;
+            empty_bin_info[counter / NUM_BINS] = false;
 
         }
 
@@ -1021,6 +1021,8 @@ void Reader::init_chr_mapping() {
 
 void remove_zero_bins(vector<bool>& empty_bin_info, Matrix<double>& matrix) {
 
+    FILE* indexfile = fopen("Index_info.txt", "a");
+    fprintf(indexfile, "\n\n\n");
     int nonzerobins = 0;
 
     // remove zero bins in positive set
@@ -1046,9 +1048,13 @@ void remove_zero_bins(vector<bool>& empty_bin_info, Matrix<double>& matrix) {
 
             }
             ++new_index;
+        } else {
+
+            fprintf(indexfile, "%d\n", old_index);
         }
     }
 
     matrix = move(shrunken_matrix);
 
+    fclose(indexfile);
 }
