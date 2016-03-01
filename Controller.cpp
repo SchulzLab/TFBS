@@ -57,6 +57,10 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     // should training be made
     training_ = false;
 
+    // flag for a file with mean values and single bin resolution
+    // value gives the position in argument string under all files that have to be read
+    int mean_file_flag = -1;
+
     bool model_given = false;
 
     bool directory_flag = false;
@@ -71,6 +75,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     bool positive_matrix_flag = false;
     bool negative_matrix_flag = false;
 
+
     // count the number of files or directorys
     // set flags and exit program if there are multiple files for the same operation
     for (int i = 0; i < argc; ++i) {
@@ -79,6 +84,11 @@ void Controller::parse_arguments(int argc, char* argv[]) {
         if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "-l")){
 
             ++number_of_data_types_;
+        }
+
+        if (!strcmp(argv[i], "-s")){
+
+            mean_file_flag = ++number_of_data_types_;
         }
 
         if (!strcmp(argv[i], "-m")) {
@@ -131,7 +141,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 
 
     // scan files and directory arguments
-    while ((c = getopt(argc, argv, "x:a:m:t:n:p:b:l:f:d:o:")) != - 1) {
+    while ((c = getopt(argc, argv, "x:a:m:t:n:p:b:l:f:d:o:s:")) != - 1) {
 
         switch (c) {
 
@@ -184,6 +194,11 @@ void Controller::parse_arguments(int argc, char* argv[]) {
             case 'b':
 
                 reader_class_positive_set_.read_simplebed_file(optarg);
+                break;
+
+            case 's':
+
+                file_flag_wolog = true;
                 break;
 
             case 'l':
@@ -266,6 +281,10 @@ void Controller::parse_arguments(int argc, char* argv[]) {
     vector<bool> log_buffer(begin(log_ratio_), end(log_ratio_));
     vector<string> files_buffer(begin(files_), end(files_));
 
+    vector<bool> pos_avg_set;
+    vector<bool> neg_avg_set;
+    vector<bool> apply_avg_set;
+
     // do only if svm should be trained
     if (training_) {
 
@@ -277,7 +296,14 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 #endif
         for (int counter = 0; counter < number_of_data_types_; ++counter) {
 
-            reader_class_positive_set_.read_file(files_buffer[counter], counter, log_buffer[counter]);
+            if (mean_file_flag -1 != counter) {
+
+                reader_class_positive_set_.read_file(files_buffer[counter], counter, log_buffer[counter]);
+
+            } else {
+
+                pos_avg_set = reader_class_positive_set_.read_mean_file(files_buffer[counter], counter);
+            }
         }
 
         // read files again to build negative training samples
@@ -289,8 +315,20 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 #endif
             for (int counter = 0; counter < number_of_data_types_; ++counter) {
 
-                reader_class_negative_set_.read_file(files_buffer[counter], counter, log_buffer[counter]);
+                if (mean_file_flag -1 != counter) {
+
+                    reader_class_negative_set_.read_file(files_buffer[counter], counter, log_buffer[counter]);
+
+                } else {
+
+                    neg_avg_set = reader_class_negative_set_.read_mean_file(files_buffer[counter], counter);
+                }
             }
+        }
+
+        // read files again to build negative training samples
+        if (negative_data_flag) {
+
             reader_class_negative_set_.rescale_data();
             reader_class_negative_set_.collateBinnedRegions();
         }
@@ -298,6 +336,7 @@ void Controller::parse_arguments(int argc, char* argv[]) {
         reader_class_positive_set_.rescale_data();
         reader_class_positive_set_.collateBinnedRegions();
     }
+
 
     // if the model should be applied read the data for the new regions
     if (to_apply_) {
@@ -314,13 +353,44 @@ void Controller::parse_arguments(int argc, char* argv[]) {
 #endif
         for (int counter = 0; counter < number_of_data_types_; ++counter) {
 
-            reader_class_apply_.read_file(files_buffer[counter], counter, log_buffer[counter]);
+            if (mean_file_flag -1 != counter) {
+
+                reader_class_apply_.read_file(files_buffer[counter], counter, log_buffer[counter]);
+
+            } else {
+
+                apply_avg_set = reader_class_apply_.read_mean_file(files_buffer[counter], counter);
+            }
         }
         reader_class_apply_.rescale_data();
         reader_class_apply_.collateBinnedRegions();
     }
 
+    // Throw out lines with empty bins
+    if (mean_file_flag != -1) {
+
+
+        if (training_) {
+
+            remove_zero_bins(pos_avg_set, reader_class_positive_set_.get_prev_read_data());
+
+            if (negative_data_flag) {
+
+                remove_zero_bins(neg_avg_set, reader_class_negative_set_.get_prev_read_data());
+
+            }
+        }
+
+        if (to_apply_) {
+
+            remove_zero_bins(apply_avg_set, reader_class_apply_.get_prev_read_data());
+
+        }
+
+    }
+
 }
+
 
 
 
@@ -395,6 +465,10 @@ Number of Support Vectors: %d\n"
                 , confusion.first(0,0), confusion.first(0,1), confusion.first(1,0), confusion.first(1,1)
                 ,confusion.second(0,0), confusion.second(0,1), confusion.second(1,0), confusion.second(1,1)
                 ,svm_get_nr_sv(svm_));
+        fprintf(result_out, "\n\nBest parameters are:\n\n\
+                C: %f\n\
+                gamma: %f\n", params->C, params->gamma);
+        fclose(result_out);
     }
 }
 

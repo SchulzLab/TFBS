@@ -45,6 +45,15 @@ class Reader
         //         boolean if peaks in file are log ratio or not
         void read_file(const string& file_path, int data_type, bool is_log);
 
+        // reads a single file given by the specified path
+        // the file should be single bin resolution and contain average values
+        //
+        // @param: path to a file to read
+        //         corresponding column in matrix_ for the type of data in the file
+        //
+        // @return: a vector telling which lines are empty
+        vector<bool> read_mean_file(const string& file_path, int data_type);
+
         // reads a peak file of ENCODE broadpeak format
         //
         // @param: path to a peak file
@@ -121,6 +130,10 @@ class Reader
         // required for efficient allocation of memory for new features
         long line_counter_;
 
+        // counts how many entries are mapped to a region for mean value computation
+        // required for read_mean_file
+        vector<int> avg_counter_;
+
         // maps for accessing intern numerical values for chromsomes in matrix
         unordered_map<string, int> map_str_to_chr_;
         unordered_map<int, string> map_chr_to_str_;
@@ -128,5 +141,15 @@ class Reader
         // internal counter for numerical values representing chromosomes in matrix
         int chrom_numerical_;
 };
+
+// Used to remove samples out of "matrix" that contain one or more empty bins
+//
+// called by    Controller  class
+//
+// @param: vector with information about which regions contain empty bins
+//          (return value of binary_search_mean)
+//
+//          corresponding matrix where samples should be removed
+void remove_zero_bins(vector<bool>& empty_bin_info, Matrix<double>& matrix);
 
 #endif /* READER_H */

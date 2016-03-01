@@ -20,12 +20,12 @@ using namespace std;
 
 // adapt this for faster peak file reading
 // it should be bigger then the actual number of lines in the file
-constexpr int INITIAL_V_CAP = 700000;
+constexpr int INITIAL_V_CAP = 400000;
 constexpr int V_CAP_STEPSIZE = 100000;
 
 // Binning information for regions
-constexpr int NUM_BINS = 6;
-constexpr int BIN_SIZE = 100;
+constexpr int NUM_BINS = 4;
+constexpr int BIN_SIZE = 75;
 
 bool bin_comp (pair<double, int> a, pair<double, int> b) { return a.first < b.first; }
 
@@ -36,6 +36,7 @@ Reader::Reader() :
         matrix_()
     ,   number_of_data_types_(0)
     ,   line_counter_(0)
+    ,   avg_counter_()
     ,   chrom_numerical_(0)
 {
     init_chr_mapping();
@@ -49,6 +50,7 @@ Reader::Reader(int number_of_data_types) :
         matrix_()
     ,   number_of_data_types_(number_of_data_types)
     ,   line_counter_(0)
+    ,   avg_counter_()
     ,   chrom_numerical_(0)
 {
     init_chr_mapping();
@@ -149,6 +151,64 @@ void Reader::read_file(const string& file_path, int data_type, bool is_log) {
 
     fclose(actual_file);
 }
+
+
+
+
+
+
+vector<bool> Reader::read_mean_file(const string& file_path, int data_type) {
+
+    FILE* actual_file = fopen (file_path.c_str(), "r");
+
+    // return value
+    vector<bool> empty_bin_info(line_counter_ / NUM_BINS, true);
+
+    // variables holding the content of one line of the file temporarily
+    int chrom_begin, chrom_end, chromosome;
+    char chrom[50];
+    float value;
+
+    avg_counter_ = vector<int>(line_counter_,0);
+
+    // read one line in the file per loop
+    while (fscanf(actual_file, "%s %d %d %f", chrom, &chrom_begin, &chrom_end, &value) == 4) {
+
+        if (map_str_to_chr_.find(chrom) != map_str_to_chr_.end()) {
+
+            chromosome = map_str_to_chr_[chrom];
+
+            // store just read data in matrix
+            binary_search_mean(chromosome, chrom_begin, chrom_end, 0, line_counter_ - 1, data_type, value);
+
+        }
+    }
+
+    if (!feof(actual_file)) {
+
+        fprintf(stderr, ("\nA reading error occured while reading \"" + file_path  + "\"\n").c_str());
+    }
+
+    // average again and update which regions should be thrown out
+    for (int counter = 0; counter < line_counter_; ++counter) {
+
+        if (avg_counter_[counter] > 0) {
+
+            matrix_(counter, data_type + 3) /= avg_counter_[counter];
+            empty_bin_info[counter % NUM_BINS] = empty_bin_info[counter % NUM_BINS] && true;
+
+        } else {
+
+            empty_bin_info[counter % NUM_BINS] = false;
+
+        }
+
+    }
+
+    fclose(actual_file);
+    return empty_bin_info;
+}
+
 
 
 
@@ -566,331 +626,6 @@ void Reader::rescale_data() {
 
 
 
-// TODO TODO TODO fix everywhere
-//
-// TODO: implement raw read count based on peak and remove partial peak -> safer and better performance
-// void Reader::binary_search(const int chrom, const int chrom_begin, const int chrom_end, const int start_point, const int end_point, const int data_type, const double peak, bool is_log) {
-//
-//
-//     // termination
-//     if (start_point > end_point) {
-//
-//         return;
-//     }
-//
-//     // center of one vector
-//     const int central_point = start_point + ((end_point - start_point) / 2);
-//
-//     // tests if query is on the same chromosome as new sample
-//     if (matrix_(central_point, 0) == chrom) {
-//
-//         // region overlap tests between query and sample
-//         if (matrix_(central_point, 1) >= chrom_begin) {
-//
-//             if (matrix_(central_point, 1) == chrom_begin) {
-//
-//                 // sample:  |---|
-//                 // query:   |---|
-//                 //  or
-//                 // sample:  |--|
-//                 // query:   |---|
-//                 if (matrix_(central_point, 2) >= chrom_end) {
-//
-//                     if (is_log) {
-//
-//                         matrix_(central_point, data_type + 3) += pow(2, peak);
-//
-//                     } else {
-//
-//                         matrix_(central_point, data_type + 3) += peak;
-//                     }
-//
-//                 // sample: |----|
-//                 // query:  |---|
-//                 } else {
-//
-//                     // remaining peak value
-//                     double partial_peak_buffer;
-//                     double partial_peak;
-//
-//                     if (is_log) {
-//
-//                         // peak value that overlaps with the query
-//                         partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * pow(2, peak);
-//                         matrix_(central_point, data_type + 3) += partial_peak;
-//                         partial_peak_buffer = pow(2, peak) - partial_peak;
-//
-//                     } else {
-//
-//                         partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
-//                         matrix_(central_point, data_type + 3) += partial_peak;
-//                         partial_peak_buffer = peak - partial_peak;
-//
-//                     }
-//
-//
-//                     // increase position in each step by one
-//                     int i = 1;
-//                     int mod_start = matrix_(central_point, 2);
-//
-//                     while (central_point + i <= line_counter_ - 1 && matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
-//
-//                         if (matrix_(central_point + i, 2) >= chrom_end) {
-//
-//                             partial_peak = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
-//                             matrix_(central_point, data_type + 3) += partial_peak;
-//                             break;
-//
-//                         } else {
-//
-//                             partial_peak = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
-//                             matrix_(central_point + i, data_type + 3) += partial_peak;
-//                             partial_peak_buffer -= partial_peak;
-//                             mod_start = matrix_(central_point + i, 2);
-//                             ++i;
-//                         }
-//                     }
-//                 }
-//
-//             // matrix(central_point, 1) > chrom_begin
-//             } else {
-//
-//                 if (matrix_(central_point, 1) < chrom_end) {
-//
-//                     // sample:  |---|
-//                     // query:    |-|
-//                     if (matrix_(central_point, 2) < chrom_end) {
-//
-//                         // remaining peak value
-//                         double partial_peak_buffer;
-//
-//                         if (is_log) {
-//
-//                             // peak value that overlaps with the query
-//                             const double partial_peak = (double)(matrix_(central_point, 2) - matrix_(central_point, 1))/(chrom_end - chrom_begin) * pow(2, peak);
-//                             matrix_(central_point, data_type + 3) += partial_peak;
-//
-//                             partial_peak_buffer = (double)(matrix_(central_point, 1) - chrom_begin)/(chrom_end - chrom_begin) * pow(2, peak);
-//
-//                         } else {
-//
-//                             // peak value that overlaps with the query
-//                             const double partial_peak = (double)(matrix_(central_point, 2) - matrix_(central_point, 1))/(chrom_end - chrom_begin) * peak;
-//                             matrix_(central_point, data_type + 3) += partial_peak;
-//
-//                             partial_peak_buffer = (double)(matrix_(central_point, 1) - chrom_begin)/(chrom_end - chrom_begin) * peak;
-//                         }
-//
-//
-//                         // overlap of left side
-//                         int i = 1;
-//                         int mod_end = matrix_(central_point, 1);
-//
-//                         while (central_point - i >= 0 && matrix_(central_point - i, 0) == chrom && matrix_(central_point - i, 2) > chrom_begin) {
-//
-//                             if (matrix_(central_point - i, 1) <= chrom_begin) {
-//
-//                                 const double partial_peak_left = (double)(matrix_(central_point - i, 2) - chrom_begin)/(mod_end - chrom_begin) * partial_peak_buffer;
-//                                 matrix_(central_point - i, data_type + 3) += partial_peak_left;
-//                                 break;
-//
-//                             } else {
-//
-//                                 const double partial_peak_left = (double)(matrix_(central_point - i, 2) - matrix_(central_point - i, 1))/(mod_end - chrom_begin) * partial_peak_buffer;
-//                                 matrix_(central_point - i, data_type + 3) += partial_peak_left;
-//                                 partial_peak_buffer -= partial_peak_left;
-//                                 mod_end = matrix_(central_point - i, 1);
-//                                 ++i;
-//                             }
-//                         }
-//
-//
-//                         if (is_log) {
-//
-//                             partial_peak_buffer = (double)(chrom_end - matrix_(central_point, 2))/(chrom_end - chrom_begin) * pow(2, peak);
-//
-//                         } else {
-//
-//                             partial_peak_buffer = (double)(chrom_end - matrix_(central_point, 2))/(chrom_end - chrom_begin) * peak;
-//
-//                         }
-//
-//
-//                         // overlap of right side
-//                         i = 1;
-//                         int mod_start = matrix_(central_point, 2);
-//
-//                         while (central_point + i <= line_counter_ - 1 && matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
-//
-//                             if (matrix_(central_point + i, 2) >= chrom_end) {
-//
-//                                 const double partial_peak_right = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
-//                                 matrix_(central_point + i, data_type + 3) += partial_peak_right;
-//                                 break;
-//
-//                             } else {
-//
-//                                 const double partial_peak_right = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
-//                                 matrix_(central_point + i, data_type + 3) += partial_peak_right;
-//                                 partial_peak_buffer -= partial_peak_right;
-//                                 mod_start = matrix_(central_point + i, 2);
-//                                 ++i;
-//                             }
-//                         }
-//
-//
-//                     // sample:  |----|
-//                     // query:     |---|
-//                     //  or
-//                     // sample:  |---|
-//                     // query:     |-|
-//                     //  or
-//                     // sample:  |---|
-//                     // query:       |--|
-//                     } else {
-//
-//                         double partial_peak_buffer;
-//                         double partial_peak;
-//
-//                         if (is_log) {
-//
-//                             // peak value that overlaps with the query
-//                             partial_peak = (double)(chrom_end - matrix_(central_point, 1))/(chrom_end - chrom_begin) * pow(2, peak);
-//                             matrix_(central_point, data_type + 3) += partial_peak;
-//                             partial_peak_buffer = pow(2, peak) - partial_peak;
-//
-//                         } else {
-//
-//                             // peak value that overlaps with the query
-//                             partial_peak = (double)(chrom_end - matrix_(central_point, 1))/(chrom_end - chrom_begin) * peak;
-//                             matrix_(central_point, data_type + 3) += partial_peak;
-//                             partial_peak_buffer = peak - partial_peak;
-//
-//                         }
-//
-//                         int i = 1;
-//                         int mod_end = matrix_(central_point, 1);
-//
-//                         while (central_point - i >= 0 && matrix_(central_point - i, 0) == chrom && matrix_(central_point - i, 2) > chrom_begin) {
-//
-//                             if (matrix_(central_point - i, 1) <= chrom_begin) {
-//
-//                                 partial_peak = (double)(matrix_(central_point - i, 2) - chrom_begin)/(mod_end - chrom_begin) * partial_peak_buffer;
-//                                 matrix_(central_point - i, data_type + 3) += partial_peak;
-//                                 break;
-//
-//                             } else {
-//
-//                                 partial_peak = (double)(matrix_(central_point - i, 2) - matrix_(central_point - i, 1))/(mod_end - chrom_begin) * partial_peak_buffer;
-//                                 matrix_(central_point - i, data_type + 3) += partial_peak;
-//                                 partial_peak_buffer -= partial_peak;
-//                                 mod_end = matrix_(central_point - i, 1);
-//                                 ++i;
-//                             }
-//                         }
-//                     }
-//
-//                 // sample: |---|
-//                 // query:        |---|
-//                 } else {
-//
-//                     binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak, is_log);
-//                 }
-//
-//             }
-//
-//         // matrix_(central_point, 1) < chrom_begin
-//         } else {
-//
-//             // sample:        |---|
-//             // query:   |---|
-//             if (matrix_(central_point, 2) <= chrom_begin) {
-//
-//                 binary_search(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, peak, is_log);
-//
-//             // matrix_(central_point, 2) > chrom_begin
-//             } else {
-//
-//                 // sample:   |--|
-//                 // query:  |----|
-//                 //  or
-//                 // sample:   |--|
-//                 // query:  |------|
-//                 if (matrix_(central_point, 2) >= chrom_end) {
-//
-//                     if (is_log) {
-//
-//                         matrix_(central_point, data_type + 3) += pow(2, peak);
-//
-//                     } else {
-//
-//                         matrix_(central_point, data_type + 3) += peak;
-//
-//                     }
-//
-//                 // sample:   |---|
-//                 // query:  |---|
-//                 } else {
-//
-//                     double partial_peak;
-//                     double partial_peak_buffer;
-//
-//                     if (is_log) {
-//
-//                         // peak value that overlaps with the query
-//                         partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * pow(2, peak);
-//                         partial_peak_buffer = pow(2, peak) - partial_peak;
-//                         matrix_(central_point, data_type + 3) += partial_peak;
-//
-//                     } else {
-//
-//                         // peak value that overlaps with the query
-//                         partial_peak = (double)(matrix_(central_point, 2) - chrom_begin)/(chrom_end - chrom_begin) * peak;
-//                         partial_peak_buffer = peak - partial_peak;
-//                         matrix_(central_point, data_type + 3) += partial_peak;
-//
-//                     }
-//
-//                     int i = 1;
-//                     int mod_start = matrix_(central_point, 2);
-//
-//                     while (central_point + i<= line_counter_ - 1 && matrix_(central_point + i, 0) == chrom && matrix_(central_point + i, 1) < chrom_end) {
-//
-//                         if (matrix_(central_point + i, 2) >= chrom_end) {
-//
-//                             partial_peak = (double)(chrom_end - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
-//                             matrix_(central_point + i, data_type + 3) += partial_peak;
-//                             break;
-//
-//                         } else {
-//
-//                             partial_peak = (double)(matrix_(central_point + i, 2) - matrix_(central_point + i, 1))/(chrom_end - mod_start) * partial_peak_buffer;
-//                             matrix_(central_point + i, data_type + 3) += partial_peak;
-//                             partial_peak_buffer -= partial_peak;
-//                             mod_start = matrix_(central_point + i, 2);
-//                             ++i;
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//
-//     } else {
-//
-//         // sample:        |---|
-//         // query:   |---|
-//         if (matrix_(central_point, 0) < chrom) {
-//
-//             binary_search(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, peak, is_log);
-//
-//         // sample:  |---|
-//         // query:         |---|
-//         } else {
-//
-//             binary_search(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, peak, is_log);
-//         }
-//     }
-// }
 void Reader::binary_search(const int chrom, const int chrom_begin, const int chrom_end, const int start_point, const int end_point, const int data_type, const double peak, bool is_log) {
 
 
@@ -1118,7 +853,6 @@ void Reader::binary_search(const int chrom, const int chrom_begin, const int chr
 
 
 
-// TODO TODO TODO
 void Reader::binary_search_mean(const int chrom, const int chrom_begin, const int chrom_end, const int start_point, const int end_point, const int data_type, const double value) {
 
     // termination
@@ -1126,7 +860,56 @@ void Reader::binary_search_mean(const int chrom, const int chrom_begin, const in
 
         return;
     }
+    // center for binary search jump
+    const int central_point = start_point + ((end_point - start_point) / 2);
+
+    if (matrix_(central_point, 0) == chrom) {
+
+        if (chrom_begin >= matrix_(central_point, 1)) {
+
+            if (chrom_begin < matrix_(central_point, 2)) {
+
+                matrix_(central_point, data_type + 3) += value;
+                ++avg_counter_[central_point];
+
+            } else {
+
+                binary_search_mean(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, value);
+
+            }
+
+        } else {
+
+            if (chrom_end <= matrix_(central_point, 1)) {
+
+                binary_search_mean(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, value);
+
+            // should not happen since we assume 1bin resolution
+            } else {
+
+                matrix_(central_point, data_type + 3) += value;
+                ++avg_counter_[central_point];
+
+            }
+        }
+
+    } else {
+
+        // sample:        |-|
+        // query:   |---|
+        if (matrix_(central_point, 0) < chrom) {
+
+            binary_search_mean(chrom, chrom_begin, chrom_end, central_point + 1, end_point, data_type, value);
+
+        // sample:  |-|
+        // query:        |---|
+        } else {
+
+            binary_search_mean(chrom, chrom_begin, chrom_end, start_point, central_point - 1, data_type, value);
+        }
+    }
 }
+
 
 
 
@@ -1229,4 +1012,43 @@ void Reader::init_chr_mapping() {
     map_str_to_chr_["chrY"] = chrom_numerical_;
     map_str_to_chr_["Y"] = chrom_numerical_;
     map_chr_to_str_[chrom_numerical_++] = "Y";
+}
+
+
+
+
+
+
+void remove_zero_bins(vector<bool>& empty_bin_info, Matrix<double>& matrix) {
+
+    int nonzerobins = 0;
+
+    // remove zero bins in positive set
+    // count nonzerobins
+    for (bool nonzerobin : empty_bin_info) {
+
+        if (nonzerobin)
+            ++nonzerobins;
+
+    }
+    fprintf(stderr, "\nThrown out %d out of %d samples because of empty bins.\n", empty_bin_info.size() - nonzerobins, empty_bin_info.size());
+    // alloc new matrix
+    Matrix<double> shrunken_matrix (nonzerobins, (matrix.get_number_of_columns()), 0);
+
+    int new_index = 0;
+    for (int old_index = 0; old_index < empty_bin_info.size(); ++old_index) {
+
+        if (empty_bin_info[old_index]) {
+
+            for (int column = 0; column < matrix.get_number_of_columns(); ++column) {
+
+                shrunken_matrix(new_index, column) = matrix(old_index, column);
+
+            }
+            ++new_index;
+        }
+    }
+
+    matrix = move(shrunken_matrix);
+
 }
