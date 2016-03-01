@@ -191,38 +191,42 @@ struct svm_parameter* train_params(const struct svm_problem* prob) {
 
     // REFINED GRID FOR GAMMA
 
-    double g = best_params->gamma;
-    double fine_grid[] = {0.125, 0.25, 0.5, 2, 4, 8};
+    double c = best_params->C;
+    const double fine_grid[6] = {0.125, 0.25, 0.5, 2, 4, 8};
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static,1) private(params, predicted) num_threads(16)
 #endif
     for (int grid_index = 0; grid_index <= 5; ++grid_index) {
 
-        // omp init
-        params = construct_svm_param(0, 0);
-        predicted = (double*) malloc(sizeof(*predicted) * prob->l);
+        for (double gamma = 0.125 * best_params->gamma; gamma <= best_params->gamma * 8; gamma *= 2) {
 
-        params->C = best_params->C;
-        params->gamma = g * fine_grid[grid_index];
-        svm_cross_validation(prob, params, k_fold, predicted);
+            // omp init
+            params = construct_svm_param(0, 0);
+            predicted = (double*) malloc(sizeof(*predicted) * prob->l);
 
-        // omp private
-        int new_best = labelset_distance(prob, predicted);
-        cerr << new_best << "\n";
-        // if this is the best found set of parameters update the current best
+            params->gamma = gamma;
+            params->C = c * fine_grid[grid_index];
+            svm_cross_validation(prob, params, k_fold, predicted);
+
+            // omp private
+            int new_best = labelset_distance(prob, predicted);
+            cerr << new_best << "\n";
+            // if this is the best found set of parameters update the current best
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-        {
-        os << best_params->C << "\t" << params->gamma << "\t" << new_best << endl;
-        if (new_best < best_result) {
+            {
+            os << best_params->C << "\t" << params->gamma << "\t" << new_best << endl;
+            if (new_best < best_result) {
 
-            best_result = new_best;
-            best_params->gamma = params->gamma;
-        }
-        }
+                best_result = new_best;
+                best_params->gamma = params->gamma;
+            }
+            }
 
-        free(predicted);
+            free(predicted);
+
+        }
 
     }
 
